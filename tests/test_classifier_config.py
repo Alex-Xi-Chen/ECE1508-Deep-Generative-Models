@@ -1,4 +1,4 @@
-from musemotion.training.classifier import apply_split_sample_limits, load_goemotions_dataset
+from musemotion.training.classifier import apply_split_sample_limits, build_trainer, load_goemotions_dataset
 
 
 class FakeSplit:
@@ -47,3 +47,19 @@ def test_load_goemotions_dataset_falls_back_to_namespaced_dataset():
 
     assert dataset is expected_dataset
     assert calls == ["go_emotions", "google-research-datasets/go_emotions"]
+
+
+def test_build_trainer_uses_processing_class_for_new_transformers_api():
+    class FakeTrainer:
+        def __init__(self, **kwargs):
+            if "tokenizer" in kwargs:
+                raise TypeError("Trainer.__init__() got an unexpected keyword argument 'tokenizer'")
+            self.kwargs = kwargs
+
+    trainer = build_trainer(
+        FakeTrainer,
+        {"model": "model", "args": "args"},
+        tokenizer="tokenizer",
+    )
+
+    assert trainer.kwargs["processing_class"] == "tokenizer"

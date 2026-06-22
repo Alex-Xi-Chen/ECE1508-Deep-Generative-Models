@@ -86,14 +86,17 @@ def train_classifier(config: dict[str, Any]) -> None:
         args_kwargs["eval_strategy"] = args_kwargs.pop("evaluation_strategy")
         training_args = TrainingArguments(**args_kwargs)
 
-    trainer = Trainer(
-        model=model,
-        args=training_args,
-        train_dataset=tokenized["train"],
-        eval_dataset=tokenized["validation"],
+    trainer = build_trainer(
+        Trainer,
+        {
+            "model": model,
+            "args": training_args,
+            "train_dataset": tokenized["train"],
+            "eval_dataset": tokenized["validation"],
+            "data_collator": DataCollatorWithPadding(tokenizer=tokenizer),
+            "compute_metrics": compute_classifier_metrics,
+        },
         tokenizer=tokenizer,
-        data_collator=DataCollatorWithPadding(tokenizer=tokenizer),
-        compute_metrics=compute_classifier_metrics,
     )
     trainer.train()
     metrics = trainer.evaluate(tokenized["test"]) if "test" in tokenized else trainer.evaluate()
@@ -140,6 +143,15 @@ def load_goemotions_dataset(load_dataset_fn: Any, dataset_name: str) -> Any:
                 break
     assert last_error is not None
     raise last_error
+
+
+def build_trainer(trainer_cls: Any, trainer_kwargs: dict[str, Any], tokenizer: Any) -> Any:
+    try:
+        return trainer_cls(**trainer_kwargs, tokenizer=tokenizer)
+    except TypeError as error:
+        if "tokenizer" not in str(error):
+            raise
+        return trainer_cls(**trainer_kwargs, processing_class=tokenizer)
 
 
 def compute_classifier_metrics(eval_pred: Any) -> dict[str, float]:
