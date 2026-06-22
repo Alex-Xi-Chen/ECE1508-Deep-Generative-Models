@@ -27,7 +27,7 @@ def train_classifier(config: dict[str, Any]) -> None:
     data_config = config.get("data", {})
     text_column = data_config.get("text_column", "text")
     label_column = data_config.get("label_column", "labels")
-    dataset = load_dataset(data_config.get("dataset_name", "go_emotions"))
+    dataset = load_goemotions_dataset(load_dataset, data_config.get("dataset_name", "go_emotions"))
     dataset = apply_split_sample_limits(dataset, data_config)
     label_names = label_names_from_goemotions_features(dataset["train"].features)
 
@@ -123,6 +123,23 @@ def apply_split_sample_limits(dataset: Any, data_config: dict[str, Any]) -> Any:
         return dataset.__class__(limited)
     except Exception:
         return limited
+
+
+def load_goemotions_dataset(load_dataset_fn: Any, dataset_name: str) -> Any:
+    candidates = [dataset_name]
+    if dataset_name == "go_emotions":
+        candidates.append("google-research-datasets/go_emotions")
+
+    last_error: Exception | None = None
+    for candidate in candidates:
+        try:
+            return load_dataset_fn(candidate)
+        except Exception as error:
+            last_error = error
+            if candidate != "go_emotions":
+                break
+    assert last_error is not None
+    raise last_error
 
 
 def compute_classifier_metrics(eval_pred: Any) -> dict[str, float]:
