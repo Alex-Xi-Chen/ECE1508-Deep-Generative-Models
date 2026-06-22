@@ -95,16 +95,21 @@ class MusicTokenizer:
 
         notes: list[MidiNote] = []
         current_start_step = 0
-        for index in range(0, len(tokens) - 3, 4):
-            shift_token, pitch_token, duration_token, velocity_token = tokens[index : index + 4]
-            if not (
-                shift_token.startswith("SHIFT_")
-                and pitch_token.startswith("PITCH_")
-                and duration_token.startswith("DUR_")
-                and velocity_token.startswith("VEL_")
-            ):
+        pending_group: list[str] = []
+        expected_prefixes = ("SHIFT_", "PITCH_", "DUR_", "VEL_")
+        for token in tokens:
+            expected_prefix = expected_prefixes[len(pending_group)]
+            if token.startswith(expected_prefix):
+                pending_group.append(token)
+            elif token.startswith("SHIFT_"):
+                pending_group = [token]
+            else:
                 continue
 
+            if len(pending_group) != 4:
+                continue
+
+            shift_token, pitch_token, duration_token, velocity_token = pending_group
             current_start_step += int(shift_token.split("_", 1)[1])
             duration_step = int(duration_token.split("_", 1)[1])
             pitch = int(pitch_token.split("_", 1)[1])
@@ -112,6 +117,7 @@ class MusicTokenizer:
             start = current_start_step / self.config.beat_resolution
             end = (current_start_step + duration_step) / self.config.beat_resolution
             notes.append(MidiNote(pitch=pitch, start=start, end=end, velocity=velocity))
+            pending_group = []
         return notes
 
     def midi_to_notes(self, midi_path: str | Path) -> list[MidiNote]:

@@ -25,3 +25,21 @@ def test_tokenizer_can_save_and_load_vocab(tmp_path):
 
     assert loaded.token_to_id == tokenizer.token_to_id
     assert loaded.id_to_token == tokenizer.id_to_token
+
+
+def test_decode_tokens_recovers_valid_note_group_after_noise():
+    tokenizer = MusicTokenizer()
+    token_ids = [
+        tokenizer.bos_token_id,
+        tokenizer.token_to_id["PITCH_60"],
+        tokenizer.token_to_id["SHIFT_0"],
+        tokenizer.token_to_id["PITCH_62"],
+        tokenizer.token_to_id["DUR_1"],
+        tokenizer.token_to_id["VEL_4"],
+        tokenizer.eos_token_id,
+    ]
+
+    decoded = tokenizer.decode_tokens(token_ids)
+
+    assert len(decoded) == 1
+    assert decoded[0].pitch == 62
