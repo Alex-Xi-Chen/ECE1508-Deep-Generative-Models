@@ -12,6 +12,7 @@ This repository contains the end-to-end code structure for:
 - generating MIDI from free-form text
 - launching a Gradio frontend for interactive demos
 - running local unit tests without downloading large datasets
+- running a verified Colab T4 smoke workflow with the official EMOPIA archive
 
 Large datasets and trained checkpoints are intentionally excluded from git.
 
@@ -72,7 +73,13 @@ from datasets import load_dataset
 load_dataset("go_emotions")
 ```
 
-EMOPIA must be downloaded separately and placed under:
+EMOPIA can be downloaded directly from the official Zenodo archive:
+
+```bash
+python -m musemotion.cli.download_emopia --output data/raw/emopia
+```
+
+The downloader retrieves `EMOPIA_1.0.zip` from [Zenodo record 5090631](https://zenodo.org/records/5090631), extracts it, and leaves MIDI files under:
 
 ```text
 data/raw/emopia/
@@ -168,7 +175,72 @@ The Gradio app provides:
 
 ## Colab
 
-Use [notebooks/musemotion_colab.ipynb](notebooks/musemotion_colab.ipynb) for the GPU workflow. The notebook installs dependencies, mounts Google Drive for EMOPIA, trains both models, and launches the Gradio demo.
+Use [notebooks/musemotion_colab.ipynb](notebooks/musemotion_colab.ipynb) for the GPU workflow. The notebook installs dependencies, downloads EMOPIA, trains both smoke models, generates a MIDI sample, and can launch the Gradio demo.
+
+The default notebook cells use:
+
+```text
+configs/colab_smoke_classifier.yaml
+configs/colab_smoke_music.yaml
+configs/inference_colab_smoke.yaml
+```
+
+These configs intentionally cap samples and use a smaller generator so the complete path can run quickly on Colab. Use `configs/classifier.yaml`, `configs/music.yaml`, and `configs/inference.yaml` for longer full runs.
+
+## Colab T4 Run Results
+
+Verified on June 22, 2026, using Google Colab with a Tesla T4 runtime:
+
+```text
+torch 2.11.0+cu128
+cuda_available True
+cuda_device Tesla T4
+Tesla T4, 15360 MiB, driver 580.82.07
+pytest: 19 passed in 2.90s
+```
+
+Dataset download and discovery:
+
+```text
+EMOPIA dataset ready at /content/ECE1508-Deep-Generative-Models/data/raw/emopia
+emopia_midi_count 1078
+emopia_quadrant_counts {'Q1': 250, 'Q2': 265, 'Q3': 253, 'Q4': 310}
+```
+
+Smoke BERT classifier fine-tuning:
+
+```text
+train_runtime 8.419s
+train_loss 1.28
+test eval_accuracy 0.5357
+test eval_macro_f1 0.1744
+test eval_loss 1.2021
+```
+
+Smoke music preprocessing and generator training:
+
+```text
+tokenized_train_count 52
+tokenized_validation_count 6
+tokenized_test_count 6
+epoch=1 train_loss=4.7669 validation_loss=4.4705
+```
+
+End-to-end generated sample:
+
+```text
+input_text "I feel hopeful but calm today"
+predicted_quadrant Q4
+confidence 0.3413
+token_count 174
+sample_path artifacts/colab_smoke/samples/hopeful_calm.mid
+sample_exists True
+sample_size_bytes 112
+sample_note_count 5
+sample_duration_seconds 4.25
+```
+
+The smoke run proves the pipeline executes end to end on GPU. The musical quality should improve with the uncapped configs and longer generator training.
 
 ## Local Verification
 
@@ -182,6 +254,8 @@ Current local coverage includes:
 
 - YAML config loading
 - GoEmotions-to-EMOPIA mapping
+- Hugging Face GoEmotions dataset compatibility
+- official EMOPIA archive download and retry behavior
 - MIDI token encode/decode behavior
 - tokenized dataset collation
 - Transformer forward pass and loss shape
