@@ -28,6 +28,7 @@ def train_classifier(config: dict[str, Any]) -> None:
     text_column = data_config.get("text_column", "text")
     label_column = data_config.get("label_column", "labels")
     dataset = load_dataset(data_config.get("dataset_name", "go_emotions"))
+    dataset = apply_split_sample_limits(dataset, data_config)
     label_names = label_names_from_goemotions_features(dataset["train"].features)
 
     def add_quadrant(example: dict[str, Any]) -> dict[str, Any]:
@@ -103,6 +104,25 @@ def train_classifier(config: dict[str, Any]) -> None:
         json.dumps({quadrant.name: quadrant.id for quadrant in EMOPIA_QUADRANTS}, indent=2),
         encoding="utf-8",
     )
+
+
+def apply_split_sample_limits(dataset: Any, data_config: dict[str, Any]) -> Any:
+    split_to_key = {
+        "train": "max_train_samples",
+        "validation": "max_validation_samples",
+        "test": "max_test_samples",
+    }
+    limited = dict(dataset)
+    for split, key in split_to_key.items():
+        limit = data_config.get(key)
+        if split not in limited or limit is None:
+            continue
+        sample_count = min(int(limit), len(limited[split]))
+        limited[split] = limited[split].select(range(sample_count))
+    try:
+        return dataset.__class__(limited)
+    except Exception:
+        return limited
 
 
 def compute_classifier_metrics(eval_pred: Any) -> dict[str, float]:

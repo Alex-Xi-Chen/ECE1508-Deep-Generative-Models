@@ -1,0 +1,11 @@
+classifier:
+  model_dir: artifacts/colab_smoke/classifier
+generator:
+  checkpoint: artifacts/colab_smoke/music/checkpoints/best.pt
+  tokenizer: artifacts/colab_smoke/music/tokenizer/vocab.json
+output:
+  sample_dir: artifacts/colab_smoke/samples
+generation:
+  max_tokens: 192
+  temperature: 0.9
+  top_k: 32

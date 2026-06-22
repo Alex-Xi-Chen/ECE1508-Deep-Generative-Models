@@ -33,15 +33,19 @@ def collate_music_batch(
     examples: list[dict[str, Any]],
     pad_token_id: int,
     label_pad_token_id: int = -100,
+    max_seq_len: int | None = None,
 ) -> dict[str, torch.Tensor]:
-    max_length = max(len(example["token_ids"]) - 1 for example in examples)
+    if max_seq_len is not None and max_seq_len <= 0:
+        raise ValueError("max_seq_len must be positive when provided.")
+
+    max_length = max(len(_truncate_token_ids(example["token_ids"], max_seq_len)) - 1 for example in examples)
     input_rows: list[list[int]] = []
     label_rows: list[list[int]] = []
     attention_rows: list[list[int]] = []
     emotion_ids: list[int] = []
 
     for example in examples:
-        token_ids = example["token_ids"]
+        token_ids = _truncate_token_ids(example["token_ids"], max_seq_len)
         input_ids = token_ids[:-1]
         labels = token_ids[1:]
         padding = max_length - len(input_ids)
@@ -56,3 +60,9 @@ def collate_music_batch(
         "attention_mask": torch.tensor(attention_rows, dtype=torch.long),
         "emotion_ids": torch.tensor(emotion_ids, dtype=torch.long),
     }
+
+
+def _truncate_token_ids(token_ids: list[int], max_seq_len: int | None) -> list[int]:
+    if max_seq_len is None:
+        return token_ids
+    return token_ids[: max_seq_len + 1]

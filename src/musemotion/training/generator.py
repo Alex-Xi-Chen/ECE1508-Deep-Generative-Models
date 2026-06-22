@@ -40,7 +40,11 @@ def train_generator(config: dict[str, Any]) -> None:
     model.to(device)
 
     batch_size = int(training_config.get("batch_size", 8))
-    collate = partial(collate_music_batch, pad_token_id=tokenizer.pad_token_id)
+    collate = partial(
+        collate_music_batch,
+        pad_token_id=tokenizer.pad_token_id,
+        max_seq_len=model_config.max_seq_len,
+    )
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=collate)
     validation_loader = (
         DataLoader(validation_dataset, batch_size=batch_size, shuffle=False, collate_fn=collate)

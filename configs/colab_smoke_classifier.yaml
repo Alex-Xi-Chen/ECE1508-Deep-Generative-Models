@@ -1,0 +1,18 @@
+model:
+  name: bert-base-uncased
+  max_length: 128
+training:
+  output_dir: artifacts/colab_smoke/classifier
+  num_train_epochs: 1
+  per_device_train_batch_size: 16
+  per_device_eval_batch_size: 32
+  learning_rate: 0.00002
+  weight_decay: 0.01
+  seed: 1508
+data:
+  dataset_name: go_emotions
+  text_column: text
+  label_column: labels
+  max_train_samples: 128
+  max_validation_samples: 64
+  max_test_samples: 64
