@@ -5,6 +5,7 @@ import random
 import re
 import shutil
 import tempfile
+import time
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -156,8 +157,29 @@ def _fetch_archive(url: str, temp_dir: Path) -> Path:
         return local_path
 
     archive_path = temp_dir / "EMOPIA_1.0.zip"
-    urllib.request.urlretrieve(url, archive_path)
+    _download_with_retries(url, archive_path)
     return archive_path
+
+
+def _download_with_retries(
+    url: str,
+    archive_path: Path,
+    attempts: int = 3,
+    sleep_seconds: float = 5.0,
+    download_fn: Any = urllib.request.urlretrieve,
+) -> Path:
+    last_error: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            download_fn(url, archive_path)
+            return archive_path
+        except Exception as error:
+            last_error = error
+            if attempt == attempts:
+                break
+            time.sleep(sleep_seconds * attempt)
+    assert last_error is not None
+    raise last_error
 
 
 def _safe_extract_zip(archive_path: Path, output_dir: Path) -> None:

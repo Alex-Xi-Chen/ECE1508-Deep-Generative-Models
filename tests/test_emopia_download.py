@@ -1,6 +1,7 @@
 import zipfile
+from urllib.error import HTTPError
 
-from musemotion.music.emopia import download_emopia_dataset
+from musemotion.music.emopia import _download_with_retries, download_emopia_dataset
 
 
 def test_download_emopia_dataset_extracts_single_root_archives(tmp_path):
@@ -17,3 +18,24 @@ def test_download_emopia_dataset_extracts_single_root_archives(tmp_path):
     assert (output_dir / "midis" / "Q1_demo.mid").read_bytes() == b"midi"
     assert (output_dir / "label.csv").exists()
 
+
+def test_download_with_retries_recovers_from_transient_http_error(tmp_path):
+    calls = []
+    archive_path = tmp_path / "archive.zip"
+
+    def flaky_download(url, filename):
+        calls.append(url)
+        if len(calls) == 1:
+            raise HTTPError(url, 504, "Gateway Time-out", {}, None)
+        archive_path.write_bytes(b"zip")
+
+    _download_with_retries(
+        "https://example.test/archive.zip",
+        archive_path,
+        attempts=2,
+        sleep_seconds=0,
+        download_fn=flaky_download,
+    )
+
+    assert len(calls) == 2
+    assert archive_path.read_bytes() == b"zip"
