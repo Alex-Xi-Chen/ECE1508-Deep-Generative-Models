@@ -1,0 +1,11 @@
+accelerate>=0.30
+datasets>=2.19
+evaluate>=0.4
+gradio>=4.44
+numpy>=1.26
+pretty_midi>=0.2.10
+pyyaml>=6.0
+pytest>=8.0
+scikit-learn>=1.4
+torch>=2.2
+transformers>=4.41

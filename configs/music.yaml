@@ -1,0 +1,32 @@
+data:
+  raw_dir: data/raw/emopia
+  tokenized_dir: artifacts/music/tokenized
+  tokenizer_dir: artifacts/music/tokenizer
+  validation_fraction: 0.1
+  test_fraction: 0.1
+  seed: 1508
+tokenizer:
+  beat_resolution: 4
+  min_pitch: 21
+  max_pitch: 108
+  velocity_bins: 8
+  max_shift_steps: 16
+  max_duration_steps: 16
+model:
+  d_model: 256
+  n_heads: 8
+  n_layers: 4
+  dropout: 0.1
+  max_seq_len: 1024
+training:
+  output_dir: artifacts/music/checkpoints
+  batch_size: 8
+  epochs: 20
+  learning_rate: 0.0003
+  weight_decay: 0.01
+  grad_clip_norm: 1.0
+  seed: 1508
+generation:
+  max_tokens: 512
+  temperature: 1.0
+  top_k: 32

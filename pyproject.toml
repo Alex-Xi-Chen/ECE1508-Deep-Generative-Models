@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "musemotion"
+version = "0.1.0"
+description = "Emotion-conditioned piano MIDI generation from text."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "accelerate>=0.30",
+  "datasets>=2.19",
+  "evaluate>=0.4",
+  "gradio>=4.44",
+  "numpy>=1.26",
+  "pretty_midi>=0.2.10",
+  "pyyaml>=6.0",
+  "scikit-learn>=1.4",
+  "torch>=2.2",
+  "transformers>=4.41",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

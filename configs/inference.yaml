@@ -1,0 +1,11 @@
+classifier:
+  model_dir: artifacts/classifier
+generator:
+  checkpoint: artifacts/music/checkpoints/best.pt
+  tokenizer: artifacts/music/tokenizer/vocab.json
+output:
+  sample_dir: artifacts/samples
+generation:
+  max_tokens: 512
+  temperature: 1.0
+  top_k: 32
