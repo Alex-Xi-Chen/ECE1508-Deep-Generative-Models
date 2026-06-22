@@ -10,6 +10,8 @@ venv/
 
 # Large or generated project assets
 data/
+!src/musemotion/data/
+!src/musemotion/data/*.py
 artifacts/
 checkpoints/
 tmp/
