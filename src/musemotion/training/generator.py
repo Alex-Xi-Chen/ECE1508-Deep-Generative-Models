@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import random
 from dataclasses import asdict
 from functools import partial
 from pathlib import Path
@@ -36,6 +38,11 @@ def train_generator(config: dict[str, Any]) -> None:
     )
     model = MusicTransformer(model_config)
     training_config = config.get("training", {})
+    seed = int(training_config.get("seed", 1508))
+    random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
@@ -63,6 +70,7 @@ def train_generator(config: dict[str, Any]) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     best_validation_loss = float("inf")
+    history: list[dict[str, float | int]] = []
     for epoch in range(1, epochs + 1):
         train_loss = train_one_epoch(model, train_loader, optimizer, device, grad_clip_norm)
         validation_loss = evaluate(model, validation_loader, device) if validation_loader is not None else train_loss
@@ -70,6 +78,15 @@ def train_generator(config: dict[str, Any]) -> None:
         if validation_loss <= best_validation_loss:
             best_validation_loss = validation_loss
             save_generator_checkpoint(output_dir / "best.pt", model, tokenizer_path, best_validation_loss)
+        history.append(
+            {
+                "epoch": epoch,
+                "train_loss": train_loss,
+                "validation_loss": validation_loss,
+                "best_validation_loss": best_validation_loss,
+            }
+        )
+        write_generator_history(output_dir, history)
 
     save_generator_checkpoint(output_dir / "last.pt", model, tokenizer_path, best_validation_loss)
 
@@ -127,3 +144,20 @@ def save_generator_checkpoint(
         checkpoint_path,
     )
     return checkpoint_path
+
+
+def write_generator_history(output_dir: str | Path, history: list[dict[str, float | int]]) -> None:
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    fields = ["epoch", "train_loss", "validation_loss", "best_validation_loss"]
+    lines = [",".join(fields)]
+    for row in history:
+        lines.append(",".join(_history_value(row[field]) for field in fields))
+    (output_path / "training_history.csv").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (output_path / "training_history.json").write_text(json.dumps(history, indent=2), encoding="utf-8")
+
+
+def _history_value(value: float | int) -> str:
+    if isinstance(value, float):
+        return f"{value:.8g}"
+    return str(value)

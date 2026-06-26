@@ -24,6 +24,7 @@ def train_classifier(config: dict[str, Any]) -> None:
 
     model_name = config["model"].get("name", "bert-base-uncased")
     max_length = int(config["model"].get("max_length", 128))
+    use_fast_tokenizer = bool(config["model"].get("use_fast_tokenizer", True))
     data_config = config.get("data", {})
     text_column = data_config.get("text_column", "text")
     label_column = data_config.get("label_column", "labels")
@@ -43,7 +44,7 @@ def train_classifier(config: dict[str, Any]) -> None:
     mapped = dataset.map(add_quadrant)
     mapped = mapped.filter(lambda example: example["emotion_id"] >= 0)
 
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=use_fast_tokenizer)
 
     def tokenize(batch: dict[str, list[Any]]) -> dict[str, Any]:
         return tokenizer(batch[text_column], truncation=True, max_length=max_length)
@@ -75,6 +76,8 @@ def train_classifier(config: dict[str, Any]) -> None:
         "seed": int(training_config.get("seed", 1508)),
         "save_strategy": "epoch",
         "evaluation_strategy": "epoch",
+        "logging_strategy": "epoch",
+        "save_safetensors": False,
         "load_best_model_at_end": True,
         "metric_for_best_model": "macro_f1",
         "greater_is_better": True,
@@ -99,6 +102,12 @@ def train_classifier(config: dict[str, Any]) -> None:
         tokenizer=tokenizer,
     )
     trainer.train()
+    training_history = list(trainer.state.log_history)
+    (output_dir / "trainer_log_history.json").write_text(
+        json.dumps(training_history, indent=2),
+        encoding="utf-8",
+    )
+    write_classifier_history_csv(output_dir / "training_history.csv", training_history)
     metrics = trainer.evaluate(tokenized["test"]) if "test" in tokenized else trainer.evaluate()
     trainer.save_model(str(output_dir))
     tokenizer.save_pretrained(str(output_dir))
@@ -161,3 +170,45 @@ def compute_classifier_metrics(eval_pred: Any) -> dict[str, float]:
         "accuracy": float(accuracy_score(labels, predictions)),
         "macro_f1": float(f1_score(labels, predictions, average="macro")),
     }
+
+
+def write_classifier_history_csv(path: str | Path, log_history: list[dict[str, Any]]) -> Path:
+    rows_by_epoch: dict[int, dict[str, Any]] = {}
+    for record in log_history:
+        epoch_value = record.get("epoch")
+        if epoch_value is None:
+            continue
+        epoch = max(1, int(round(float(epoch_value))))
+        row = rows_by_epoch.setdefault(epoch, {"epoch": epoch})
+        if "loss" in record and "eval_loss" not in record:
+            row["train_loss"] = float(record["loss"])
+        if "eval_loss" in record:
+            row["validation_loss"] = float(record["eval_loss"])
+            if "eval_accuracy" in record:
+                row["validation_accuracy"] = float(record["eval_accuracy"])
+            if "eval_macro_f1" in record:
+                row["validation_macro_f1"] = float(record["eval_macro_f1"])
+
+    fields = [
+        "epoch",
+        "train_loss",
+        "validation_loss",
+        "validation_accuracy",
+        "validation_macro_f1",
+    ]
+    csv_lines = [",".join(fields)]
+    for epoch in sorted(rows_by_epoch):
+        row = rows_by_epoch[epoch]
+        csv_lines.append(",".join(_csv_value(row.get(field)) for field in fields))
+
+    history_path = Path(path)
+    history_path.write_text("\n".join(csv_lines) + "\n", encoding="utf-8")
+    return history_path
+
+
+def _csv_value(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, float):
+        return f"{value:.8g}"
+    return str(value)

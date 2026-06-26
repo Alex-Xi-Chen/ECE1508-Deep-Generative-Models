@@ -242,6 +242,26 @@ sample_duration_seconds 4.25
 
 The smoke run proves the pipeline executes end to end on GPU. The musical quality should improve with the uncapped configs and longer generator training.
 
+## Real Multi-Epoch Training Records
+
+The following curves are generated from real 42-epoch training histories saved as CSV files in `figures/`.
+
+Classifier run:
+
+- dataset: real GoEmotions subset mapped to EMOPIA quadrants
+- model: pretrained `prajjwal1/bert-tiny`
+- history: [`figures/musemotion_classifier_real_training_history.csv`](figures/musemotion_classifier_real_training_history.csv)
+
+![Real BERT classifier training curve](figures/musemotion_classifier_real_training_curve.png)
+
+Music generator run:
+
+- dataset: real EMOPIA MIDI subset, 76 train / 10 validation / 10 test tokenized clips
+- model: emotion-conditioned Transformer
+- history: [`figures/musemotion_music_real_training_history.csv`](figures/musemotion_music_real_training_history.csv)
+
+![Real EMOPIA music generator training curve](figures/musemotion_music_real_training_curve.png)
+
 ## Local Verification
 
 The local tests are designed to run without GoEmotions, EMOPIA, GPU access, or trained checkpoints.
