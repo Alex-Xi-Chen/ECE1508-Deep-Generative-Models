@@ -1,0 +1,10 @@
+{
+  "type": "deterministic_random_piano_generator",
+  "module": "musemotion.music.random_generator",
+  "description": "Saved generator config that recreates samples/random_piano_seed_260625.mid.",
+  "seed": 260625,
+  "tempo_bpm": 92,
+  "scale": [48, 50, 52, 55, 57, 60, 62, 64, 67, 69, 72],
+  "chord_roots": [48, 53, 55, 50],
+  "steps": 32
+}
