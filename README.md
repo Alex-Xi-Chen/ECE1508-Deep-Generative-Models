@@ -13,8 +13,9 @@ This repository contains the end-to-end code structure for:
 - launching a Gradio frontend for interactive demos
 - running local unit tests without downloading large datasets
 - running a verified Colab T4 smoke workflow with the official EMOPIA archive
+- shipping real 42-epoch training charts and lightweight trained checkpoints from the latest real-data run
 
-Large datasets and trained checkpoints are intentionally excluded from git.
+Large datasets and bulky per-epoch optimizer checkpoints are intentionally excluded from git. The repository keeps a lightweight real-run checkpoint snapshot for presentation and reproducibility.
 
 ## System Overview
 
@@ -42,6 +43,8 @@ docs/superpowers/        Design and implementation planning notes
 notebooks/               Colab workflow notebook
 src/musemotion/          Python package and CLI modules
 tests/                   Local tests with synthetic fixtures
+figures/                 Real training charts and CSV metric histories
+models/real_training/    Lightweight checkpoints from the real 42-epoch runs
 data/raw/emopia/         Expected EMOPIA dataset location, ignored by git
 artifacts/               Generated datasets, checkpoints, metrics, and samples
 ```
@@ -242,7 +245,9 @@ sample_duration_seconds 4.25
 
 The smoke run proves the pipeline executes end to end on GPU. The musical quality should improve with the uncapped configs and longer generator training.
 
-## Real Multi-Epoch Training Records
+## Real Multi-Epoch Training Results
+
+Updated after commit `658280f` on June 25, 2026. The `figures/` folder now keeps only real-data training charts and CSV records; mock charts, one-epoch smoke charts, and the old nested chart folder were removed.
 
 The following curves are generated from real 42-epoch training histories saved as CSV files in `figures/`.
 
@@ -272,7 +277,12 @@ Additional real-data visualizations are saved directly under `figures/`:
 - [`performance_summary_table.png`](figures/performance_summary_table.png)
 - [`real_training_summary.csv`](figures/real_training_summary.csv)
 
-The lightweight trained checkpoints from these real runs are committed under [`models/real_training/`](models/real_training/). Large datasets and per-epoch optimizer checkpoints remain excluded from git.
+The lightweight trained checkpoints from these real runs are committed under [`models/real_training/`](models/real_training/):
+
+- [`models/real_training/classifier_tiny_bert_42epoch/`](models/real_training/classifier_tiny_bert_42epoch/)
+- [`models/real_training/music_transformer_42epoch/`](models/real_training/music_transformer_42epoch/)
+
+Large datasets and per-epoch optimizer checkpoints remain excluded from git.
 
 ## Local Verification
 
@@ -303,5 +313,6 @@ Current local coverage includes:
 ## Notes
 
 - `data/`, `artifacts/`, `checkpoints/`, `output/`, `.venv/`, and `.superpowers/` are ignored.
-- The repo does not ship EMOPIA or trained checkpoints.
+- The repo does not ship EMOPIA or full training artifacts.
+- The repo does ship lightweight real-run checkpoints under `models/real_training/`.
 - The implementation is meant to train on GPU or Colab, while remaining testable on a normal laptop.
