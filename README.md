@@ -250,27 +250,27 @@ Classifier run:
 
 - dataset: real GoEmotions subset mapped to EMOPIA quadrants
 - model: pretrained `prajjwal1/bert-tiny`
-- history: [`figures/musemotion_classifier_real_training_history.csv`](figures/musemotion_classifier_real_training_history.csv)
+- history: [`figures/classifier_training_history.csv`](figures/classifier_training_history.csv)
 
-![Real BERT classifier training curve](figures/musemotion_classifier_real_training_curve.png)
+![Real BERT classifier training curve](figures/classifier_training_curve.png)
 
 Music generator run:
 
 - dataset: real EMOPIA MIDI subset, 76 train / 10 validation / 10 test tokenized clips
 - model: emotion-conditioned Transformer
-- history: [`figures/musemotion_music_real_training_history.csv`](figures/musemotion_music_real_training_history.csv)
+- history: [`figures/music_generator_training_history.csv`](figures/music_generator_training_history.csv)
 
-![Real EMOPIA music generator training curve](figures/musemotion_music_real_training_curve.png)
+![Real EMOPIA music generator training curve](figures/music_generator_training_curve.png)
 
-Additional MSG-style visualizations are saved under `figures/results-training-chart/`:
+Additional real-data visualizations are saved directly under `figures/`:
 
-- [`musemotion_learning_curves_42epochs_msg_style.png`](figures/results-training-chart/musemotion_learning_curves_42epochs_msg_style.png)
-- [`musemotion_performance_comparison_msg_style.png`](figures/results-training-chart/musemotion_performance_comparison_msg_style.png)
-- [`musemotion_overfitting_analysis_msg_style.png`](figures/results-training-chart/musemotion_overfitting_analysis_msg_style.png)
-- [`musemotion_best_metrics_msg_style.png`](figures/results-training-chart/musemotion_best_metrics_msg_style.png)
-- [`musemotion_train_vs_validation_final_msg_style.png`](figures/results-training-chart/musemotion_train_vs_validation_final_msg_style.png)
-- [`musemotion_performance_table_msg_style.png`](figures/results-training-chart/musemotion_performance_table_msg_style.png)
-- [`musemotion_real_training_summary.csv`](figures/results-training-chart/musemotion_real_training_summary.csv)
+- [`learning_curves_42epochs.png`](figures/learning_curves_42epochs.png)
+- [`performance_comparison.png`](figures/performance_comparison.png)
+- [`overfitting_analysis.png`](figures/overfitting_analysis.png)
+- [`best_metrics.png`](figures/best_metrics.png)
+- [`final_train_vs_validation_loss.png`](figures/final_train_vs_validation_loss.png)
+- [`performance_summary_table.png`](figures/performance_summary_table.png)
+- [`real_training_summary.csv`](figures/real_training_summary.csv)
 
 The lightweight trained checkpoints from these real runs are committed under [`models/real_training/`](models/real_training/). Large datasets and per-epoch optimizer checkpoints remain excluded from git.
 
