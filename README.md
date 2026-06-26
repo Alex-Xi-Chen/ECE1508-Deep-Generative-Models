@@ -262,6 +262,18 @@ Music generator run:
 
 ![Real EMOPIA music generator training curve](figures/musemotion_music_real_training_curve.png)
 
+Additional MSG-style visualizations are saved under `figures/msg_style_real_training/`:
+
+- [`musemotion_learning_curves_42epochs_msg_style.png`](figures/msg_style_real_training/musemotion_learning_curves_42epochs_msg_style.png)
+- [`musemotion_performance_comparison_msg_style.png`](figures/msg_style_real_training/musemotion_performance_comparison_msg_style.png)
+- [`musemotion_overfitting_analysis_msg_style.png`](figures/msg_style_real_training/musemotion_overfitting_analysis_msg_style.png)
+- [`musemotion_best_metrics_msg_style.png`](figures/msg_style_real_training/musemotion_best_metrics_msg_style.png)
+- [`musemotion_train_vs_validation_final_msg_style.png`](figures/msg_style_real_training/musemotion_train_vs_validation_final_msg_style.png)
+- [`musemotion_performance_table_msg_style.png`](figures/msg_style_real_training/musemotion_performance_table_msg_style.png)
+- [`musemotion_real_training_summary.csv`](figures/msg_style_real_training/musemotion_real_training_summary.csv)
+
+The lightweight trained checkpoints from these real runs are committed under [`models/real_training/`](models/real_training/). Large datasets and per-epoch optimizer checkpoints remain excluded from git.
+
 ## Local Verification
 
 The local tests are designed to run without GoEmotions, EMOPIA, GPU access, or trained checkpoints.
