@@ -1,0 +1,9 @@
+{
+  "description": "Random piano MIDI generated for the MUSEmotion repository.",
+  "seed": 260625,
+  "tempo_bpm": 92,
+  "instrument": "Acoustic Grand Piano",
+  "midi_path": "samples/random_piano_seed_260625.mid",
+  "note_count": 44,
+  "duration_seconds": 16.8
+}
