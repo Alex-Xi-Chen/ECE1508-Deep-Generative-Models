@@ -180,9 +180,21 @@ The Gradio app provides:
 
 ## Colab
 
-Use [notebooks/musemotion_colab.ipynb](notebooks/musemotion_colab.ipynb) for the GPU workflow. The notebook installs dependencies, downloads EMOPIA, trains both smoke models, generates a MIDI sample, and can launch the Gradio demo.
+Use [notebooks/musemotion_colab.ipynb](notebooks/musemotion_colab.ipynb) for a shareable Colab workflow. The notebook installs dependencies, verifies the committed checkpoints, generates a MIDI sample from the GitHub model, and can launch the Gradio demo.
 
-The default notebook cells use:
+Open the shareable notebook in Google Colab:
+
+[`https://colab.research.google.com/github/Alex-Xi-Chen/ECE1508-Deep-Generative-Models/blob/main/notebooks/musemotion_colab.ipynb`](https://colab.research.google.com/github/Alex-Xi-Chen/ECE1508-Deep-Generative-Models/blob/main/notebooks/musemotion_colab.ipynb)
+
+The first runnable path uses:
+
+```text
+configs/inference.yaml
+models/real_training/classifier_tiny_bert_42epoch/
+models/real_training/music_transformer_42epoch/
+```
+
+The optional final cells download EMOPIA and re-run the capped smoke training flow using:
 
 ```text
 configs/colab_smoke_classifier.yaml
@@ -190,7 +202,7 @@ configs/colab_smoke_music.yaml
 configs/inference_colab_smoke.yaml
 ```
 
-These configs intentionally cap samples and use a smaller generator so the complete path can run quickly on Colab. Use `configs/classifier.yaml`, `configs/music.yaml`, and `configs/inference.yaml` for longer full runs.
+The smoke configs intentionally cap samples and use a smaller generator so the complete training path can run quickly on Colab. Use `configs/classifier.yaml`, `configs/music.yaml`, and `configs/inference.yaml` for longer full runs.
 
 ## Colab T4 Run Results
 
