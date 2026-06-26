@@ -145,6 +145,8 @@ artifacts/music/checkpoints/
 
 ## Inference
 
+The default [`configs/inference.yaml`](configs/inference.yaml) uses the lightweight trained checkpoints committed under [`models/real_training/`](models/real_training/). Generated MIDI files are still written to ignored `artifacts/samples/` by default.
+
 Generate a MIDI file from text:
 
 ```bash

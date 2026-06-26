@@ -1,8 +1,8 @@
 classifier:
-  model_dir: artifacts/classifier
+  model_dir: models/real_training/classifier_tiny_bert_42epoch
 generator:
-  checkpoint: artifacts/music/checkpoints/best.pt
-  tokenizer: artifacts/music/tokenizer/vocab.json
+  checkpoint: models/real_training/music_transformer_42epoch/best.pt
+  tokenizer: models/real_training/music_transformer_42epoch/tokenizer/vocab.json
 output:
   sample_dir: artifacts/samples
 generation:
