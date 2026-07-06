@@ -44,7 +44,6 @@ GOEMOTIONS_TO_QUADRANT: dict[str, str] = {
     "joy": "Q1",
     "love": "Q4",
     "nervousness": "Q2",
-    "neutral": "Q4",
     "optimism": "Q1",
     "pride": "Q1",
     "realization": "Q4",

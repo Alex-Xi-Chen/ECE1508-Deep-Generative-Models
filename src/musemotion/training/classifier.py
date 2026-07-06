@@ -13,11 +13,13 @@ from musemotion.emotions import EMOPIA_QUADRANTS, map_goemotion_labels_to_quadra
 
 
 def train_classifier(config: dict[str, Any]) -> None:
+    import torch
     from datasets import load_dataset
     from transformers import (
         AutoModelForSequenceClassification,
         AutoTokenizer,
         DataCollatorWithPadding,
+        EarlyStoppingCallback,
         Trainer,
         TrainingArguments,
     )
@@ -56,6 +58,27 @@ def train_classifier(config: dict[str, Any]) -> None:
         tokenized[split] = tokenized[split].remove_columns(remove_columns)
         tokenized[split] = tokenized[split].rename_column("emotion_id", "labels")
 
+    # Balanced class weights (inverse frequency) to counter GoEmotions->quadrant
+    # imbalance, which otherwise collapses the model to the majority quadrant.
+    train_labels = np.asarray(tokenized["train"]["labels"])
+    counts = np.bincount(train_labels, minlength=len(EMOPIA_QUADRANTS)).astype("float64")
+    counts = np.clip(counts, 1.0, None)  # guard empty quadrants against div-by-zero
+    class_weights = torch.tensor(counts.sum() / (len(counts) * counts), dtype=torch.float)
+
+    class WeightedTrainer(Trainer):
+        def __init__(self, *args: Any, class_weights: Any = None, **kwargs: Any) -> None:
+            super().__init__(*args, **kwargs)
+            self._class_weights = class_weights
+
+        def compute_loss(self, model, inputs, return_outputs=False, **kwargs):  # type: ignore[override]
+            labels = inputs.pop("labels")
+            outputs = model(**inputs)
+            weight = None
+            if self._class_weights is not None:
+                weight = self._class_weights.to(outputs.logits.device)
+            loss = torch.nn.functional.cross_entropy(outputs.logits, labels, weight=weight)
+            return (loss, outputs) if return_outputs else loss
+
     model = AutoModelForSequenceClassification.from_pretrained(
         model_name,
         num_labels=len(EMOPIA_QUADRANTS),
@@ -89,8 +112,9 @@ def train_classifier(config: dict[str, Any]) -> None:
         args_kwargs["eval_strategy"] = args_kwargs.pop("evaluation_strategy")
         training_args = TrainingArguments(**args_kwargs)
 
+    patience = int(training_config.get("early_stopping_patience", 3))
     trainer = build_trainer(
-        Trainer,
+        WeightedTrainer,
         {
             "model": model,
             "args": training_args,
@@ -98,6 +122,8 @@ def train_classifier(config: dict[str, Any]) -> None:
             "eval_dataset": tokenized["validation"],
             "data_collator": DataCollatorWithPadding(tokenizer=tokenizer),
             "compute_metrics": compute_classifier_metrics,
+            "callbacks": [EarlyStoppingCallback(early_stopping_patience=patience)],
+            "class_weights": class_weights,
         },
         tokenizer=tokenizer,
     )
