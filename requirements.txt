@@ -1,6 +1,7 @@
 accelerate>=0.30
 datasets>=2.19
 evaluate>=0.4
+gdown>=5.0
 gradio>=4.44
 numpy>=1.26
 pretty_midi>=0.2.10

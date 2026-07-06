@@ -1,23 +1,24 @@
 # Real Training Model Artifacts
 
-This folder keeps the lightweight trained artifacts from the real 42-epoch runs used to generate the committed training visualizations.
+This folder keeps the trained artifacts from the full-dataset runs used to generate the committed training charts.
 
 ## Classifier
 
-`classifier_tiny_bert_42epoch/` contains the final Hugging Face checkpoint for the GoEmotions-to-EMOPIA quadrant classifier:
+`classifier_bert_base/` contains the GoEmotions-to-EMOPIA quadrant classifier:
 
-- base model: `prajjwal1/bert-tiny`
-- training data: real GoEmotions subset mapped to EMOPIA quadrants
-- epochs: 42
-- key files: `pytorch_model.bin`, `config.json`, `vocab.txt`, tokenizer configs, `label_mapping.json`, `training_history.csv`
+- base model: `bert-base-uncased`
+- training data: full GoEmotions mapped to EMOPIA quadrants (27,906 train / 3,514 validation / 3,526 test), after dropping `neutral` and cross-quadrant ties
+- selection: best validation macro-F1 (epoch 2), class-weighted loss, early stopping
+- test set: accuracy 0.806, macro-F1 0.770
+- committed files: `config.json`, `vocab.txt`, tokenizer configs, `label_mapping.json`, `metrics.json`, `training_history.csv`
+- weights: `pytorch_model.bin` (438 MB) is hosted on Google Drive and fetched with `python scripts/download_classifier.py`
 
 ## Music Generator
 
-`music_transformer_42epoch/` contains the trained symbolic music generator checkpoints:
+`music_transformer_fulldata/` contains the emotion-conditioned Transformer:
 
-- model: emotion-conditioned Transformer
-- training data: real EMOPIA MIDI subset
-- epochs: 42
-- key files: `best.pt`, `last.pt`, `tokenizer/vocab.json`, `training_history.csv`
+- training data: full EMOPIA (862 train / 108 validation / 108 test tokenized clips)
+- epochs: 50, best validation loss 1.515 at epoch 41
+- key files: `best.pt`, `tokenizer/vocab.json`, `training_history.csv`, `training_history.json`
 
-Large datasets and per-epoch optimizer checkpoints are still excluded from git.
+Large datasets and per-epoch optimizer checkpoints are excluded from git.

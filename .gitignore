@@ -16,6 +16,7 @@ artifacts/
 checkpoints/
 tmp/
 output/
+*.zip
 
 # Local brainstorming/browser companion state
 .superpowers/

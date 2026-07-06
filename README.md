@@ -13,9 +13,9 @@ This repository contains the end-to-end code structure for:
 - launching a Gradio frontend for interactive demos
 - running local unit tests without downloading large datasets
 - running a verified Colab T4 smoke workflow with the official EMOPIA archive
-- shipping real 42-epoch training charts and lightweight trained checkpoints from the latest real-data run
+- shipping full-dataset training charts and trained checkpoints from the latest real-data run
 
-Large datasets and bulky per-epoch optimizer checkpoints are intentionally excluded from git. The repository keeps a lightweight real-run checkpoint snapshot for presentation and reproducibility.
+Large datasets and bulky per-epoch optimizer checkpoints are intentionally excluded from git. The repository keeps the music generator checkpoint plus the classifier config, tokenizer, and metrics; the 438 MB `bert-base-uncased` classifier weights are hosted on Google Drive and fetched with `scripts/download_classifier.py`.
 
 ## System Overview
 
@@ -43,8 +43,9 @@ docs/superpowers/        Design and implementation planning notes
 notebooks/               Colab workflow notebook
 src/musemotion/          Python package and CLI modules
 tests/                   Local tests with synthetic fixtures
+scripts/                 Figure generation and classifier download helpers
 figures/                 Real training charts and CSV metric histories
-models/real_training/    Lightweight checkpoints from the real 42-epoch runs
+models/real_training/    Trained checkpoints (classifier weights via Google Drive)
 data/raw/emopia/         Expected EMOPIA dataset location, ignored by git
 artifacts/               Generated datasets, checkpoints, metrics, and samples
 ```
@@ -145,7 +146,14 @@ artifacts/music/checkpoints/
 
 ## Inference
 
-The default [`configs/inference.yaml`](configs/inference.yaml) uses the lightweight trained checkpoints committed under [`models/real_training/`](models/real_training/). Generated MIDI files are still written to ignored `artifacts/samples/` by default.
+The default [`configs/inference.yaml`](configs/inference.yaml) uses the trained checkpoints under [`models/real_training/`](models/real_training/). The music generator checkpoint is committed; the `bert-base-uncased` classifier weights download from Google Drive:
+
+```bash
+pip install gdown
+python scripts/download_classifier.py
+```
+
+Generated MIDI files are written to ignored `artifacts/samples/` by default.
 
 Generate a MIDI file from text:
 
@@ -190,8 +198,8 @@ The first runnable path uses:
 
 ```text
 configs/inference.yaml
-models/real_training/classifier_tiny_bert_42epoch/
-models/real_training/music_transformer_42epoch/
+models/real_training/classifier_bert_base/          (weights via scripts/download_classifier.py)
+models/real_training/music_transformer_fulldata/
 ```
 
 The optional final cells download EMOPIA and re-run the capped smoke training flow using:
@@ -261,40 +269,43 @@ The smoke run proves the pipeline executes end to end on GPU. The musical qualit
 
 ## Real Multi-Epoch Training Results
 
-Updated after commit `658280f` on June 25, 2026. The `figures/` folder now keeps only real-data training charts and CSV records; mock charts, one-epoch smoke charts, and the old nested chart folder were removed.
+These results come from training on the full datasets (uncapped `configs/classifier.yaml` and `configs/music.yaml`) on a Colab T4. The charts are regenerated from the committed CSV histories with `python scripts/plot_training.py`.
 
-The following curves are generated from real 42-epoch training histories saved as CSV files in `figures/`.
+### Emotion classifier
 
-Classifier run:
+- base model: `bert-base-uncased`
+- data: full GoEmotions mapped to EMOPIA quadrants, 27,906 train / 3,514 validation / 3,526 test (after dropping `neutral` and cross-quadrant ties)
+- training: class-weighted cross-entropy, best checkpoint selected on validation macro-F1, early stopping (stopped at epoch 5, best at epoch 2)
+- test set: accuracy 0.806, macro-F1 0.770 (4-class chance is 0.25)
+- history: [`models/real_training/classifier_bert_base/training_history.csv`](models/real_training/classifier_bert_base/training_history.csv)
 
-- dataset: real GoEmotions subset mapped to EMOPIA quadrants
-- model: pretrained `prajjwal1/bert-tiny`
-- history: [`figures/classifier_training_history.csv`](figures/classifier_training_history.csv)
+![Classifier training curve](figures/classifier_training_curve.png)
 
-![Real BERT classifier training curve](figures/classifier_training_curve.png)
+Validation loss rises after epoch 2 while accuracy and macro-F1 stay around 0.80 / 0.77, so the checkpoint is selected on macro-F1 rather than loss.
 
-Music generator run:
+### Music generator
 
-- dataset: real EMOPIA MIDI subset, 76 train / 10 validation / 10 test tokenized clips
-- model: emotion-conditioned Transformer
-- history: [`figures/music_generator_training_history.csv`](figures/music_generator_training_history.csv)
+- model: emotion-conditioned Transformer (d_model 256, 4 layers, 8 heads)
+- data: full EMOPIA, 862 train / 108 validation / 108 test tokenized clips
+- training: 50 epochs, best validation loss 1.515 at epoch 41
+- history: [`models/real_training/music_transformer_fulldata/training_history.csv`](models/real_training/music_transformer_fulldata/training_history.csv)
 
-![Real EMOPIA music generator training curve](figures/music_generator_training_curve.png)
+![Music generator training curve](figures/music_generator_training_curve.png)
 
-Additional real-data visualizations are saved directly under `figures/`:
+Additional charts under `figures/`:
 
-- [`learning_curves_42epochs.png`](figures/learning_curves_42epochs.png)
-- [`performance_comparison.png`](figures/performance_comparison.png)
+- [`learning_curves.png`](figures/learning_curves.png)
 - [`overfitting_analysis.png`](figures/overfitting_analysis.png)
 - [`best_metrics.png`](figures/best_metrics.png)
-- [`final_train_vs_validation_loss.png`](figures/final_train_vs_validation_loss.png)
 - [`performance_summary_table.png`](figures/performance_summary_table.png)
 - [`real_training_summary.csv`](figures/real_training_summary.csv)
 
-The lightweight trained checkpoints from these real runs are committed under [`models/real_training/`](models/real_training/):
+Sample clips from the trained pipeline, one per quadrant, are committed under [`samples/`](samples/): `q1_joyful.mid`, `q2_angry.mid`, `q3_sad.mid`, `q4_calm.mid`.
 
-- [`models/real_training/classifier_tiny_bert_42epoch/`](models/real_training/classifier_tiny_bert_42epoch/)
-- [`models/real_training/music_transformer_42epoch/`](models/real_training/music_transformer_42epoch/)
+Trained checkpoints are under [`models/real_training/`](models/real_training/):
+
+- [`models/real_training/classifier_bert_base/`](models/real_training/classifier_bert_base/) — config, tokenizer, label mapping, and metrics are committed; `pytorch_model.bin` (438 MB) is fetched with [`scripts/download_classifier.py`](scripts/download_classifier.py)
+- [`models/real_training/music_transformer_fulldata/`](models/real_training/music_transformer_fulldata/) — `best.pt`, tokenizer, histories
 
 Large datasets and per-epoch optimizer checkpoints remain excluded from git.
 
@@ -328,5 +339,5 @@ Current local coverage includes:
 
 - `data/`, `artifacts/`, `checkpoints/`, `output/`, `.venv/`, and `.superpowers/` are ignored.
 - The repo does not ship EMOPIA or full training artifacts.
-- The repo does ship lightweight real-run checkpoints under `models/real_training/`.
+- The repo ships the music generator checkpoint under `models/real_training/`; the `bert-base-uncased` classifier weights are fetched from Google Drive via `scripts/download_classifier.py`.
 - The implementation is meant to train on GPU or Colab, while remaining testable on a normal laptop.

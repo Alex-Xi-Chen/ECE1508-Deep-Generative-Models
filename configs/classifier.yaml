@@ -12,7 +12,6 @@ training:
   seed: 1508
 data:
   # No max_*_samples keys: train on the full GoEmotions corpus.
-  # Capping this is what collapsed the shipped bert-tiny run (177 examples).
   dataset_name: go_emotions
   text_column: text
   label_column: labels
