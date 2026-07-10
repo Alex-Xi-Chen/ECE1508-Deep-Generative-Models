@@ -17,6 +17,7 @@ checkpoints/
 tmp/
 output/
 *.zip
+models/real_training/classifier_bert_base/pytorch_model.bin
 
 # Local brainstorming/browser companion state
 .superpowers/
