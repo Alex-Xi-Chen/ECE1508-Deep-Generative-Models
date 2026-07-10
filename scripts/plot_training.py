@@ -26,7 +26,7 @@ MUSIC_HISTORY = REPO_ROOT / "models/real_training/music_transformer_fulldata/tra
 # Dataset sizes for this run (GoEmotions full after neutral-drop + tie filtering;
 # EMOPIA full 80/10/10 split). Baked in so the summary is reproducible without the
 # gitignored artifacts/ tokenized files.
-CLS_TRAIN, CLS_VAL, CLS_TEST = 27906, 3514, 3526
+CLS_TRAIN, CLS_VAL, CLS_TEST = 25873, 3249, 3270
 MUS_TRAIN, MUS_VAL, MUS_TEST = 862, 108, 108
 
 TRAIN_C = "#2b6cb0"   # blue
@@ -157,7 +157,7 @@ def main() -> None:
     cls_best = cls.loc[cls.validation_macro_f1.idxmax()]  # trainer selects on macro-F1
     mus_best = mus.loc[mus.validation_loss.idxmin()]
     # Test-set eval of the selected model (from metrics.json), reported in README.
-    test_acc, test_f1 = 0.8063, 0.7698
+    test_acc, test_f1 = 0.8275, 0.7885
 
     classifier_curve(cls)
     music_curve(mus)

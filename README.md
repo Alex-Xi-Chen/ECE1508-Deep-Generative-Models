@@ -281,25 +281,23 @@ The smoke run proves the pipeline executes end to end on GPU. The musical qualit
 
 These results come from training on the full datasets (uncapped `configs/classifier.yaml` and `configs/music.yaml`) on a Colab T4. The charts are regenerated from the committed CSV histories with `python scripts/plot_training.py`.
 
-> The emotion mapping was revised after this run (see [Design Decisions](#design-decisions)), so the classifier numbers below are refreshed on the next retrain.
-
 ### Emotion classifier
 
 - base model: `bert-base-uncased`
-- data: full GoEmotions mapped to EMOPIA quadrants, 27,906 train / 3,514 validation / 3,526 test (after dropping `neutral` and cross-quadrant ties)
-- training: class-weighted cross-entropy, best checkpoint selected on validation macro-F1, early stopping (stopped at epoch 5, best at epoch 2)
-- test set: accuracy 0.806, macro-F1 0.770 (4-class chance is 0.25)
+- data: full GoEmotions mapped to EMOPIA quadrants, 25,873 train / 3,249 validation / 3,270 test (after dropping the no-clear-valence labels `neutral`, `surprise`, `confusion`, `realization` and cross-quadrant ties)
+- training: class-weighted cross-entropy, best checkpoint selected on validation macro-F1 (epoch 4)
+- test set: accuracy 0.828, macro-F1 0.788 (4-class chance is 0.25)
 - history: [`models/real_training/classifier_bert_base/training_history.csv`](models/real_training/classifier_bert_base/training_history.csv)
 
 ![Classifier training curve](figures/classifier_training_curve.png)
 
-Validation loss rises after epoch 2 while accuracy and macro-F1 stay around 0.80 / 0.77, so the checkpoint is selected on macro-F1 rather than loss.
+Validation loss rises after a couple of epochs while accuracy and macro-F1 stay around 0.83 / 0.79, so the checkpoint is selected on macro-F1 rather than loss.
 
 ### Music generator
 
 - model: emotion-conditioned Transformer (d_model 256, 4 layers, 8 heads)
 - data: full EMOPIA, 862 train / 108 validation / 108 test tokenized clips
-- training: 50 epochs, best validation loss 1.515 at epoch 41
+- training: 50 epochs, best validation loss 1.519 at epoch 38
 - history: [`models/real_training/music_transformer_fulldata/training_history.csv`](models/real_training/music_transformer_fulldata/training_history.csv)
 
 ![Music generator training curve](figures/music_generator_training_curve.png)
@@ -312,7 +310,7 @@ Additional charts under `figures/`:
 - [`performance_summary_table.png`](figures/performance_summary_table.png)
 - [`real_training_summary.csv`](figures/real_training_summary.csv)
 
-Sample clips from the trained pipeline, one per quadrant, are committed under [`samples/`](samples/): `q1_joyful.mid`, `q2_angry.mid`, `q3_sad.mid`, `q4_calm.mid`.
+Sample clips are committed under [`samples/`](samples/): text-conditioned `q1_joyful.mid` / `q2_angry.mid` / `q3_sad.mid` / `q4_calm.mid`, plus `forced_Q1.mid`–`forced_Q4.mid`, which condition the generator directly on each quadrant with classifier-free guidance.
 
 Trained checkpoints are under [`models/real_training/`](models/real_training/):
 
