@@ -91,6 +91,16 @@ data/raw/emopia/
 
 The EMOPIA preprocessing command recursively scans for `.mid` and `.midi` files whose path contains `Q1`, `Q2`, `Q3`, or `Q4`.
 
+## Design Decisions
+
+Full rationale is in [docs/design_decisions.md](docs/design_decisions.md). Summary:
+
+- **Emotion mapping** is a rule-based table from GoEmotions labels to EMOPIA quadrants ([`src/musemotion/emotions.py`](src/musemotion/emotions.py)): Q1 positive/high-arousal, Q2 negative/high, Q3 negative/low, Q4 positive/low.
+- **Dropped labels** (no clear valence, so they are not mapped and their examples are dropped): `neutral`, `surprise`, `confusion`, `realization`. `neutral` is also the most frequent GoEmotions label, so mapping it pushed the classifier toward a single class.
+- **Multi-label handling**: each example's labels are mapped, the majority quadrant wins, and ties are dropped.
+- **Classifier**: full GoEmotions, `bert-base-uncased`, class-weighted loss to counter quadrant imbalance, checkpoint selected on macro-F1 with early stopping.
+- **Music generator**: full EMOPIA; each generated clip uses a distinct seed (a shared seed makes clips artificially similar); `--quadrant` forces an emotion to test the generator without the classifier.
+
 ## Training Workflow
 
 Run the stages in this order.
@@ -270,6 +280,8 @@ The smoke run proves the pipeline executes end to end on GPU. The musical qualit
 ## Real Multi-Epoch Training Results
 
 These results come from training on the full datasets (uncapped `configs/classifier.yaml` and `configs/music.yaml`) on a Colab T4. The charts are regenerated from the committed CSV histories with `python scripts/plot_training.py`.
+
+> The emotion mapping was revised after this run (see [Design Decisions](#design-decisions)), so the classifier numbers below are refreshed on the next retrain.
 
 ### Emotion classifier
 

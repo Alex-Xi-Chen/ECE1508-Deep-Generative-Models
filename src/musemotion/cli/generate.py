@@ -5,8 +5,14 @@ import json
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Generate an emotion-conditioned piano MIDI clip from text.")
-    parser.add_argument("--text", required=True, help="Emotion-laden user text.")
+    parser = argparse.ArgumentParser(description="Generate an emotion-conditioned piano MIDI clip.")
+    parser.add_argument("--text", default=None, help="Emotion-laden user text (classified into a quadrant).")
+    parser.add_argument(
+        "--quadrant",
+        default=None,
+        choices=["Q1", "Q2", "Q3", "Q4"],
+        help="Force an EMOPIA quadrant and skip the classifier (for testing the generator in isolation).",
+    )
     parser.add_argument("--config", default="configs/inference.yaml", help="Path to inference YAML config.")
     parser.add_argument("--output", default=None, help="Destination MIDI path.")
     parser.add_argument("--temperature", type=float, default=None, help="Sampling temperature override.")
@@ -19,7 +25,10 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> None:
     from musemotion.inference.pipeline import generate_from_config
 
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if not args.text and not args.quadrant:
+        parser.error("provide --text (classifier) or --quadrant (forced emotion).")
     overrides = {
         key: value
         for key, value in {
@@ -30,7 +39,13 @@ def main(argv: list[str] | None = None) -> None:
         }.items()
         if value is not None
     }
-    result = generate_from_config(args.text, config_path=args.config, output_path=args.output, **overrides)
+    result = generate_from_config(
+        args.text or "",
+        config_path=args.config,
+        output_path=args.output,
+        quadrant=args.quadrant,
+        **overrides,
+    )
     print(json.dumps(result.to_dict(), indent=2))
 
 

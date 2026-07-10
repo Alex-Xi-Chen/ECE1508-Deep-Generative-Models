@@ -34,12 +34,24 @@ class GenerationResult:
 
 def generate_with_components(
     text: str,
-    classifier: EmotionClassifier,
+    classifier: EmotionClassifier | None,
     generator: MidiGenerator,
     output_path: str | Path,
+    quadrant: str | None = None,
     **generation_kwargs: Any,
 ) -> GenerationResult:
-    prediction = classifier.predict(text)
+    if quadrant is not None:
+        # Forced quadrant: skip the classifier so the generator can be exercised in isolation.
+        prediction = {
+            "quadrant": quadrant,
+            "emotion_id": quadrant_id(quadrant),
+            "confidence": 1.0,
+            "probabilities": {},
+        }
+    elif classifier is None:
+        raise ValueError("A classifier is required unless an explicit quadrant is provided.")
+    else:
+        prediction = classifier.predict(text)
     generated = generator.generate_midi(
         emotion_id=int(prediction["emotion_id"]),
         output_path=output_path,
@@ -155,17 +167,23 @@ def generate_from_config(
     text: str,
     config_path: str | Path = "configs/inference.yaml",
     output_path: str | Path | None = None,
+    quadrant: str | None = None,
     **generation_kwargs: Any,
 ) -> GenerationResult:
     config = load_yaml_config(config_path)
     sample_dir = resolve_path(config.get("output", {}).get("sample_dir", "artifacts/samples"))
     sample_dir.mkdir(parents=True, exist_ok=True)
     destination = Path(output_path) if output_path is not None else sample_dir / "musemotion_sample.mid"
-    classifier = BertEmotionClassifier.from_pretrained(resolve_path(config["classifier"]["model_dir"]))
     generator = MusicGeneratorComponent.from_checkpoint(
         resolve_path(config["generator"]["checkpoint"]),
         tokenizer_path=resolve_path(config["generator"]["tokenizer"]),
     )
-    defaults = config.get("generation", {})
+    # A forced quadrant skips the classifier entirely (no weights download required).
+    classifier = (
+        None
+        if quadrant is not None
+        else BertEmotionClassifier.from_pretrained(resolve_path(config["classifier"]["model_dir"]))
+    )
+    defaults = dict(config.get("generation", {}))  # copy so overrides do not mutate the loaded config
     defaults.update(generation_kwargs)
-    return generate_with_components(text, classifier, generator, destination, **defaults)
+    return generate_with_components(text, classifier, generator, destination, quadrant=quadrant, **defaults)

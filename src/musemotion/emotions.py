@@ -23,6 +23,9 @@ EMOPIA_QUADRANTS: tuple[EmotionQuadrant, ...] = (
 
 _QUADRANTS_BY_NAME = {quadrant.name: quadrant for quadrant in EMOPIA_QUADRANTS}
 
+# GoEmotions labels mapped to EMOPIA valence-arousal quadrants.
+# Labels without a clear valence are intentionally omitted so they are dropped during
+# mapping (see docs/design_decisions.md): neutral, surprise, confusion, realization.
 GOEMOTIONS_TO_QUADRANT: dict[str, str] = {
     "admiration": "Q1",
     "amusement": "Q1",
@@ -30,27 +33,24 @@ GOEMOTIONS_TO_QUADRANT: dict[str, str] = {
     "annoyance": "Q2",
     "approval": "Q1",
     "caring": "Q4",
-    "confusion": "Q4",
-    "curiosity": "Q4",
-    "desire": "Q4",
+    "curiosity": "Q1",   # positive and activating (approach/interest) -> high arousal
+    "desire": "Q1",      # positive but high arousal (craving/wanting)
     "disappointment": "Q3",
     "disapproval": "Q2",
     "disgust": "Q2",
     "embarrassment": "Q2",
     "excitement": "Q1",
     "fear": "Q2",
-    "gratitude": "Q1",
+    "gratitude": "Q4",   # warm, low-arousal positive
     "grief": "Q3",
     "joy": "Q1",
     "love": "Q4",
     "nervousness": "Q2",
     "optimism": "Q1",
     "pride": "Q1",
-    "realization": "Q4",
-    "relief": "Q1",
+    "relief": "Q4",      # calm, low-arousal positive
     "remorse": "Q3",
     "sadness": "Q3",
-    "surprise": "Q4",
 }
 
 
