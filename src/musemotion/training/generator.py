@@ -66,13 +66,14 @@ def train_generator(config: dict[str, Any]) -> None:
     )
     epochs = int(training_config.get("epochs", 20))
     grad_clip_norm = float(training_config.get("grad_clip_norm", 1.0))
+    condition_dropout = float(training_config.get("condition_dropout", 0.1))
     output_dir = resolve_path(training_config.get("output_dir", "artifacts/music/checkpoints"))
     output_dir.mkdir(parents=True, exist_ok=True)
 
     best_validation_loss = float("inf")
     history: list[dict[str, float | int]] = []
     for epoch in range(1, epochs + 1):
-        train_loss = train_one_epoch(model, train_loader, optimizer, device, grad_clip_norm)
+        train_loss = train_one_epoch(model, train_loader, optimizer, device, grad_clip_norm, condition_dropout)
         validation_loss = evaluate(model, validation_loader, device) if validation_loader is not None else train_loss
         print(f"epoch={epoch} train_loss={train_loss:.4f} validation_loss={validation_loss:.4f}")
         if validation_loss <= best_validation_loss:
@@ -97,11 +98,21 @@ def train_one_epoch(
     optimizer: AdamW,
     device: torch.device,
     grad_clip_norm: float,
+    condition_dropout: float = 0.0,
 ) -> float:
     model.train()
     total_loss = 0.0
     for batch in loader:
         batch = {key: value.to(device) for key, value in batch.items()}
+        if condition_dropout > 0:
+            # Randomly drop the emotion to the null id so the model also learns an
+            # unconditional distribution, which classifier-free guidance uses at sampling.
+            drop = torch.rand(batch["emotion_ids"].shape, device=device) < condition_dropout
+            batch["emotion_ids"] = torch.where(
+                drop,
+                torch.full_like(batch["emotion_ids"], model.null_emotion_id),
+                batch["emotion_ids"],
+            )
         optimizer.zero_grad(set_to_none=True)
         output = model(**batch)
         assert output.loss is not None

@@ -70,18 +70,23 @@ distribution after mapping.
 - **Distinct seed per generated clip.** A shared seed makes the sampler draw the same
   random sequence for every clip, so clips come out artificially similar regardless of the
   emotion. Different seeds give a fair comparison across quadrants.
+- **Classifier-free guidance (CFG).** The emotion is added as an embedding to the token
+  embeddings, which alone is a weak signal. During training the emotion is randomly dropped
+  (~10%, `training.condition_dropout`) and replaced with a learned null embedding, so the
+  model also learns an unconditional distribution. At generation the logits are extrapolated
+  away from that unconditional prediction by `generation.guidance_scale` (>1) to make the
+  target emotion more pronounced. Without it, the four quadrants tend to produce nearly
+  identical clips.
 - **`--quadrant` override.** `python -m musemotion.cli.generate --quadrant Q1 ...`
   conditions the generator directly on a quadrant and skips the classifier, which lets us
   test the generator in isolation and produce controlled clips for the human evaluation.
 - **Evaluation**: training and validation loss, plus a small human evaluation where
   listeners rate musical quality and how well a clip matches its intended quadrant.
 
-### Known limitation
+### Remaining limitation
 
-Emotion conditioning is a single embedding added to the token embeddings, and with limited
-data the generator responds only weakly to the emotion (different quadrants can produce
-nearly identical clips). A planned improvement is stronger conditioning, e.g. an emotion
-control token and/or classifier-free guidance.
+EMOPIA is small (~1078 clips), so overall musical quality is bounded by the available data
+even with classifier-free guidance improving how distinct the emotions sound.
 
 ## Model hosting
 

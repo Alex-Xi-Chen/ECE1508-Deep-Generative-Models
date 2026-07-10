@@ -99,7 +99,7 @@ Full rationale is in [docs/design_decisions.md](docs/design_decisions.md). Summa
 - **Dropped labels** (no clear valence, so they are not mapped and their examples are dropped): `neutral`, `surprise`, `confusion`, `realization`. `neutral` is also the most frequent GoEmotions label, so mapping it pushed the classifier toward a single class.
 - **Multi-label handling**: each example's labels are mapped, the majority quadrant wins, and ties are dropped.
 - **Classifier**: full GoEmotions, `bert-base-uncased`, class-weighted loss to counter quadrant imbalance, checkpoint selected on macro-F1 with early stopping.
-- **Music generator**: full EMOPIA; each generated clip uses a distinct seed (a shared seed makes clips artificially similar); `--quadrant` forces an emotion to test the generator without the classifier.
+- **Music generator**: full EMOPIA; emotion conditioning uses classifier-free guidance (condition dropout in training + `generation.guidance_scale` at sampling) so the quadrants sound distinct; each generated clip uses a distinct seed; `--quadrant` forces an emotion to test the generator without the classifier.
 
 ## Training Workflow
 

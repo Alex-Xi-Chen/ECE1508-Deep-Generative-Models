@@ -11,3 +11,4 @@ generation:
   max_tokens: 512
   temperature: 1.0
   top_k: 32
+  guidance_scale: 3.0

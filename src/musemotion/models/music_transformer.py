@@ -35,7 +35,9 @@ class MusicTransformer(nn.Module):
         self.config = config
         self.token_embedding = nn.Embedding(config.vocab_size, config.d_model, padding_idx=config.pad_token_id)
         self.position_embedding = nn.Embedding(config.max_seq_len, config.d_model)
-        self.emotion_embedding = nn.Embedding(config.num_emotions, config.d_model)
+        # One extra row is the "null"/unconditional embedding used for classifier-free guidance.
+        self.null_emotion_id = config.num_emotions
+        self.emotion_embedding = nn.Embedding(config.num_emotions + 1, config.d_model)
         self.dropout = nn.Dropout(config.dropout)
         layer = nn.TransformerEncoderLayer(
             d_model=config.d_model,
@@ -87,6 +89,24 @@ class MusicTransformer(nn.Module):
             )
         return MusicModelOutput(logits=logits, loss=loss)
 
+    def _last_token_logits(
+        self,
+        context: list[int],
+        emotion_id: int,
+        guidance_scale: float,
+        use_cfg: bool,
+        device: torch.device,
+    ) -> torch.Tensor:
+        if use_cfg:
+            input_ids = torch.tensor([context, context], dtype=torch.long, device=device)
+            emotion_ids = torch.tensor([emotion_id, self.null_emotion_id], dtype=torch.long, device=device)
+            last = self(input_ids=input_ids, emotion_ids=emotion_ids).logits[:, -1, :]
+            conditioned, unconditioned = last[0], last[1]
+            return (unconditioned + guidance_scale * (conditioned - unconditioned)).unsqueeze(0)
+        input_ids = torch.tensor([context], dtype=torch.long, device=device)
+        emotion_ids = torch.tensor([emotion_id], dtype=torch.long, device=device)
+        return self(input_ids=input_ids, emotion_ids=emotion_ids).logits[:, -1, :]
+
     @torch.no_grad()
     def sample(
         self,
@@ -94,18 +114,20 @@ class MusicTransformer(nn.Module):
         max_tokens: int = 512,
         temperature: float = 1.0,
         top_k: int | None = 32,
+        guidance_scale: float = 1.0,
         prompt_token_ids: list[int] | None = None,
         device: torch.device | str | None = None,
     ) -> list[int]:
         self.eval()
         target_device = torch.device(device) if device is not None else next(self.parameters()).device
         generated = list(prompt_token_ids or [self.config.bos_token_id])
-        emotion_ids = torch.tensor([emotion_id], dtype=torch.long, device=target_device)
+        # Classifier-free guidance: extrapolate away from the unconditional (null) prediction
+        # to make the emotion more pronounced. Requires training with condition dropout.
+        use_cfg = guidance_scale is not None and abs(guidance_scale - 1.0) > 1e-6
 
         for _ in range(max_tokens):
             context = generated[-self.config.max_seq_len :]
-            input_ids = torch.tensor([context], dtype=torch.long, device=target_device)
-            logits = self(input_ids=input_ids, emotion_ids=emotion_ids).logits[:, -1, :]
+            logits = self._last_token_logits(context, emotion_id, guidance_scale, use_cfg, target_device)
             logits[:, self.config.pad_token_id] = -torch.inf
             if temperature <= 0:
                 next_token = int(torch.argmax(logits, dim=-1).item())

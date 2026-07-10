@@ -27,8 +27,10 @@ training:
   learning_rate: 0.0003
   weight_decay: 0.01
   grad_clip_norm: 1.0
+  condition_dropout: 0.1   # fraction of steps trained with the emotion dropped (for classifier-free guidance)
   seed: 1508
 generation:
   max_tokens: 512
   temperature: 1.0
   top_k: 32
+  guidance_scale: 3.0      # >1 strengthens the conditioned emotion at sampling time

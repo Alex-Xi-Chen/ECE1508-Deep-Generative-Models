@@ -17,6 +17,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", default=None, help="Destination MIDI path.")
     parser.add_argument("--temperature", type=float, default=None, help="Sampling temperature override.")
     parser.add_argument("--top-k", type=int, default=None, help="Top-k sampling override.")
+    parser.add_argument(
+        "--guidance-scale",
+        type=float,
+        default=None,
+        help="Classifier-free guidance scale (>1 strengthens the emotion; needs a model trained with condition dropout).",
+    )
     parser.add_argument("--max-tokens", type=int, default=None, help="Maximum generated token count.")
     parser.add_argument("--seed", type=int, default=None, help="Optional random seed.")
     return parser
@@ -34,6 +40,7 @@ def main(argv: list[str] | None = None) -> None:
         for key, value in {
             "temperature": args.temperature,
             "top_k": args.top_k,
+            "guidance_scale": args.guidance_scale,
             "max_tokens": args.max_tokens,
             "seed": args.seed,
         }.items()

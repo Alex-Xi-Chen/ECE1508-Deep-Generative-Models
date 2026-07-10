@@ -146,6 +146,7 @@ class MusicGeneratorComponent:
         max_tokens: int = 512,
         temperature: float = 1.0,
         top_k: int | None = 32,
+        guidance_scale: float = 1.0,
         seed: int | None = None,
     ) -> dict[str, Any]:
         import torch
@@ -157,6 +158,7 @@ class MusicGeneratorComponent:
             max_tokens=max_tokens,
             temperature=temperature,
             top_k=top_k,
+            guidance_scale=guidance_scale,
             device=self.device,
         )
         path = self.tokenizer.token_ids_to_midi(token_ids, output_path)
