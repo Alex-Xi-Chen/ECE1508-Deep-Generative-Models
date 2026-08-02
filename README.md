@@ -193,12 +193,15 @@ python -m musemotion.frontend.app --config configs/inference.yaml
 The Gradio app provides:
 
 - text input for the user's emotional state
-- generation controls for temperature, top-k, max tokens, and seed
+- generation controls for temperature, top-k, max tokens, guidance scale, and seed
 - predicted quadrant metadata
 - downloadable generated MIDI output
 
-The app does not expose `guidance_scale`, so it generates without classifier-free guidance even
-when `configs/inference.yaml` sets it. Use the CLI with `--guidance-scale` for guided generation.
+The guidance scale slider defaults to `generation.guidance_scale` from the config. A value of
+`1.0` disables classifier-free guidance; higher values push the predicted emotion harder.
+
+On Colab the app must be launched with `--share`, and only the printed `gradio.live` public URL
+is reachable — the `127.0.0.1` local URL refers to the Colab VM, not your machine.
 
 ## Colab
 
