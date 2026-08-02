@@ -39,12 +39,13 @@ The classifier and generator share the same four-label emotion space:
 
 ```text
 configs/                 YAML configs for classifier, generator, and inference
-docs/superpowers/        Design and implementation planning notes
-notebooks/               Colab workflow notebook
+docs/                    design_decisions.md plus superpowers/ planning notes
+notebooks/               Colab demo notebook
 src/musemotion/          Python package and CLI modules
 tests/                   Local tests with synthetic fixtures
 scripts/                 Figure generation and classifier download helpers
 figures/                 Real training charts and CSV metric histories
+samples/                 Committed example MIDI clips, one per quadrant
 models/real_training/    Trained checkpoints (classifier weights via Google Drive)
 data/raw/emopia/         Expected EMOPIA dataset location, ignored by git
 artifacts/               Generated datasets, checkpoints, metrics, and samples
@@ -196,15 +197,24 @@ The Gradio app provides:
 - predicted quadrant metadata
 - downloadable generated MIDI output
 
+The app does not expose `guidance_scale`, so it generates without classifier-free guidance even
+when `configs/inference.yaml` sets it. Use the CLI with `--guidance-scale` for guided generation.
+
 ## Colab
 
-Use [notebooks/musemotion_colab.ipynb](notebooks/musemotion_colab.ipynb) for a shareable Colab workflow. The notebook installs dependencies, verifies the committed checkpoints, generates a MIDI sample from the GitHub model, and can launch the Gradio demo.
+Use [notebooks/musemotion_colab.ipynb](notebooks/musemotion_colab.ipynb) for a shareable Colab workflow.
 
 Open the shareable notebook in Google Colab:
 
 [`https://colab.research.google.com/github/Alex-Xi-Chen/ECE1508-Deep-Generative-Models/blob/main/notebooks/musemotion_colab.ipynb`](https://colab.research.google.com/github/Alex-Xi-Chen/ECE1508-Deep-Generative-Models/blob/main/notebooks/musemotion_colab.ipynb)
 
-The first runnable path uses:
+The notebook is split into a demo path and clearly marked optional sections:
+
+- **Steps 1-6, the demo (about 5 minutes, CPU is fine).** Install dependencies, download the classifier weights from Google Drive, verify every model file is present, generate a clip from a fixed input text and fixed seed, and play it inline. Run these in order; nothing else is needed.
+- **Steps 7-9, optional.** Batch-generate many clips across all four quadrants from a single loaded generator, run your own text through the classifier, or launch the Gradio app with a public share link.
+- **Steps 10-13, optional retraining.** A capped smoke run of the whole pipeline (about 5 minutes), then the full uncapped run on a GPU (about 1 to 1.5 hours) with the results zipped to Google Drive.
+
+The demo path uses:
 
 ```text
 configs/inference.yaml
@@ -212,19 +222,23 @@ models/real_training/classifier_bert_base/          (weights via scripts/downloa
 models/real_training/music_transformer_fulldata/
 ```
 
-The optional final cells download EMOPIA and re-run the capped smoke training flow using:
+The optional retraining steps use:
 
 ```text
-configs/colab_smoke_classifier.yaml
-configs/colab_smoke_music.yaml
-configs/inference_colab_smoke.yaml
+configs/colab_smoke_classifier.yaml     smoke retrain
+configs/colab_smoke_music.yaml          smoke retrain
+configs/inference_colab_smoke.yaml      smoke retrain
+configs/classifier.yaml                 full retrain
+configs/music.yaml                      full retrain
 ```
 
-The smoke configs intentionally cap samples and use a smaller generator so the complete training path can run quickly on Colab. Use `configs/classifier.yaml`, `configs/music.yaml`, and `configs/inference.yaml` for longer full runs.
+The smoke configs intentionally cap samples and use a smaller generator so the complete training path can run quickly on Colab. The full configs are the ones that produced the checkpoints in `models/real_training/`.
 
 ## Colab T4 Run Results
 
-Verified on June 22, 2026, using Google Colab with a Tesla T4 runtime:
+Verified on June 22, 2026, using Google Colab with a Tesla T4 runtime. These are point-in-time
+figures from that run: the test suite has since grown to 20 tests, and the smoke training numbers
+below are superseded by the full-dataset results in the next section.
 
 ```text
 torch 2.11.0+cu128
@@ -338,6 +352,7 @@ Current local coverage includes:
 - Transformer forward pass and loss shape
 - CLI import safety
 - inference orchestration with fake components
+- deterministic random piano generator baseline
 
 ## Configuration
 
