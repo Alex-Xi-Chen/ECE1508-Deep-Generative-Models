@@ -39,10 +39,19 @@ is the ceiling every round-trip number is read against.
 - `probe_metadata.json` — both probes' train/validation/test metrics, confusion matrices, the
   feature coefficients, and the shuffled-label controls.
 
-**The control is the reason to trust the rest.** Retrained on permuted labels, the probes drop to
-0.232 and 0.176 accuracy against a 0.25 chance baseline, so they are reading emotion rather than
-some artifact of the representation. Four-class symbolic emotion recognition on EMOPIA is
-genuinely hard; roughly 0.66 is the achievable range, not 1.0.
+**The control is the reason to trust the rest.** Retrained on labels permuted within the training
+*and validation* splits — permuting only training labels would leave the control free to select
+its checkpoint on the true labels it is supposed to have no access to — the probes drop to 0.231
+and 0.324 accuracy.
+
+Read those against **0.315, not 0.25**. The test split runs 20/24/30/34, so a model that always
+answers Q4 scores 0.315 while learning nothing; uniform chance is the wrong bar for accuracy on
+an imbalanced split. The feature control lands below even uniform chance. The neural control sits
+at the majority-class rate with a macro-F1 of 0.271, which is what collapsing onto the frequent
+classes looks like. Neither retains usable signal.
+
+Four-class symbolic emotion recognition on EMOPIA is genuinely hard; roughly 0.66 is the
+achievable range, not 1.0.
 
 ## Tokenized EMOPIA
 

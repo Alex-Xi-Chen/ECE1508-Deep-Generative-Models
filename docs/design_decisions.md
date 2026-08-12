@@ -47,10 +47,19 @@ GoEmotions is multi-label. For each example we map every label to a quadrant, ta
 **majority quadrant**, and **drop the example when there is no unique majority** (a tie
 across quadrants), since those examples send a conflicting emotional signal.
 
-### Validation (planned)
+### Validation
 
-Manually check representative examples per quadrant and report the final label
-distribution after mapping.
+The mapping is exercised end to end by the 40-prompt set in
+[`src/musemotion/evaluation/prompts.py`](../src/musemotion/evaluation/prompts.py), ten
+sentences per quadrant with the quadrant each is meant to express, fixed before any results
+were inspected. The classifier scores **0.850** on it, consistent with its 0.828 on the
+mapped GoEmotions test split.
+
+The disagreements are informative rather than simply wrong. Five of the six are Q4 read as
+Q1 — "I feel settled and gently hopeful" is called Q1 with full confidence, because
+`hopeful` maps through `optimism` to Q1 in the table above. That is the mapping and the
+intent disagreeing about arousal, not the model failing, and it is worth keeping in mind
+that Q4 is also the quadrant the music generator renders least reliably.
 
 ## Classifier training
 
@@ -80,13 +89,65 @@ distribution after mapping.
 - **`--quadrant` override.** `python -m musemotion.cli.generate --quadrant Q1 ...`
   conditions the generator directly on a quadrant and skips the classifier, which lets us
   test the generator in isolation and produce controlled clips for the human evaluation.
-- **Evaluation**: training and validation loss, plus a small human evaluation where
-  listeners rate musical quality and how well a clip matches its intended quadrant.
+- **Evaluation**: training and validation loss, plus the objective evaluation below. A
+  listening study is still outstanding and is the only thing that can speak to quality.
 
-### Remaining limitation
+## Evaluating the generated music
+
+Loss and classifier accuracy measure prediction, not perception. Neither says whether a
+listener would hear the intended emotion, so the output itself is measured two ways, which
+are complementary rather than alternatives: a generator that had simply memorised EMOPIA
+would score near-perfectly on the first and only the second would catch it.
+
+- **Round-trip recovery.** A MIDI-to-quadrant probe reads generated clips back and predicts
+  the conditioning quadrant. Two probes are trained, one neural and one over hand-built
+  symbolic features, sharing the note representation and nothing else; their agreement is
+  evidence in its own right.
+- **Novelty.** Note n-gram overlap with the training corpus, plus the longest exactly-copied
+  run, on both an absolute-pitch and a transposition-invariant view.
+
+Three decisions make those numbers readable.
+
+- **Everything is reported beside real held-out EMOPIA clips scored identically.** The probes
+  reach 0.657 on real music, so that is the ceiling, and round-trip accuracy is also expressed
+  as a fraction of it. A novelty rate has no scale on its own; the same rate next to the
+  real-data reference does.
+- **The probes are retrained on permuted labels as a control**, with the permutation covering
+  the validation split too — otherwise the control would still select its checkpoint on true
+  labels. If the control does not collapse, the probe is reading something other than emotion
+  and nothing downstream means anything.
+- **Accuracy is read against the majority-class rate, not uniform chance.** The test split runs
+  20/24/30/34, so always answering Q4 scores 0.315 without learning anything.
+
+### What the evaluation found
+
+- Classifier-free guidance is what makes the conditioning recoverable: round-trip accuracy
+  0.550 with guidance off against 0.790 at guidance 3.0, with non-overlapping intervals over
+  200 clips per setting.
+- The recoverable signal is almost entirely **arousal**. One cross-arousal error in 200 clips,
+  against 41 valence errors. With guidance off, valence sits at 0.590 against a 0.5 baseline;
+  guidance adds +0.205 to valence and only +0.11 to arousal.
+- Valence errors are **directional**: 36 positive-to-negative against 5 the other way. Q4 is
+  the weak quadrant at 0.54 recall, with 23 of 50 clips read as Q3.
+- No memorisation. Not one generated clip shares an 8-note pattern with the training corpus;
+  the longest copied run is 6-7 notes against 40 for real held-out clips.
+- Guidance 3.0 is the shipped setting because 5.0 buys no further accuracy while costing
+  fidelity, diversity and clip length. Probe agreement independently peaks at 3.0.
+
+Full numbers are in the README, and any run writes them to `artifacts/evaluation/metrics.json`.
+
+### Remaining limitations
 
 EMOPIA is small (~1078 clips), so overall musical quality is bounded by the available data
 even with classifier-free guidance improving how distinct the emotions sound.
+
+Valence is the weaker axis by a wide margin, and the tokenizer is a plausible reason: arousal
+is written directly into note density, velocity and duration, which the `SHIFT, PITCH, DUR,
+VEL` vocabulary represents explicitly, while valence lives in harmony and mode, which it
+encodes only implicitly. Adding an explicit key or mode token is the obvious next experiment.
+
+No metric here measures musical quality. Distributional similarity to real EMOPIA is the
+closest available proxy and it is only a proxy; the listening study remains the gap.
 
 ## Model hosting
 

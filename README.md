@@ -208,16 +208,99 @@ sampling and the random-piano baseline), and the end-to-end text-to-music path. 
 `python scripts/plot_evaluation.py --metrics artifacts/evaluation/metrics.json --save`.
 
 Both commands run on the committed probes and tokenized splits, so neither needs the EMOPIA
-download. Two numbers are worth knowing before reading any result:
+download.
 
-- **The probes reach 0.66 and 0.60 on real held-out clips**, not 1.0. Four-way symbolic emotion
-  recognition is hard, so that is the ceiling every round-trip accuracy is read against, and the
-  `controllability_ratio` column does that division.
-- **Retrained on permuted labels the probes collapse to chance.** That control is what makes the
-  rest of the numbers worth anything; it is recorded in `probe_metadata.json`.
+### Are the judges trustworthy?
 
-No metric here measures musical quality. They measure controllability, novelty, and
-distributional similarity to real EMOPIA — answering whether the music is *good* needs listeners.
+Every round-trip number is divided by the probes' own accuracy on real music, so that number has
+to come first.
+
+| probe | real held-out EMOPIA | retrained on **permuted labels** |
+|-------|----------------------|----------------------------------|
+| feature (logistic regression, 28 symbolic features) | 0.657 acc / 0.660 macro-F1 | 0.231 |
+| neural (2-layer bidirectional encoder) | 0.602 / 0.595 | 0.324 |
+
+**0.657 is the ceiling, not 1.0.** Four-way symbolic emotion recognition is genuinely hard.
+
+The controls are read against the **majority-class rate of 0.315**, not uniform chance: the test
+split runs 20/24/30/34, so always answering Q4 scores 0.315 while learning nothing. The feature
+control lands below even uniform chance; the neural control lands at the majority-class rate with
+a macro-F1 of 0.271, which is what a run that collapses onto frequent classes looks like. Neither
+retains usable signal, which is what makes everything below worth reading.
+
+### Results
+
+Full run on a Colab T4: 200 clips per guidance setting, 40 pre-registered prompts end to end,
+guidance swept over 1.0, 2.0, 3.0 and 5.0.
+
+> Reproduce with notebook Step 9a, then run its save-results cell to write the run to
+> `models/real_training/evaluation/metrics.json`. Once that file is committed,
+> `tests/test_committed_artifacts.py` checks this table against it cell by cell; until then the
+> table is a transcription and the test skips with a message saying so.
+
+| system | n | round-trip | 95% CI | arousal | valence | vs ceiling | novel 8-gram | max copy | diversity | fidelity |
+|--------|---|-----------|--------|---------|---------|-----------|--------------|----------|-----------|----------|
+| **real EMOPIA (ceiling)** | 108 | 0.657 | 0.564–0.740 | 0.880 | 0.713 | 1.000 | 0.991 | **40** | 0.992 | 0.859 |
+| guidance 1.0 (CFG off) | 200 | 0.550 | 0.481–0.617 | 0.885 | 0.590 | 0.837 | 1.000 | 6 | 0.983 | 0.795 |
+| guidance 2.0 | 200 | 0.710 | 0.644–0.768 | 0.980 | 0.710 | 1.080 | 1.000 | 6 | 0.985 | 0.810 |
+| **guidance 3.0 (shipped)** | 200 | **0.790** | 0.728–0.841 | 0.995 | 0.795 | 1.202 | 1.000 | 7 | 0.981 | 0.803 |
+| guidance 5.0 | 200 | 0.725 | 0.659–0.782 | 0.995 | 0.730 | 1.103 | 1.000 | 7 | 0.974 | 0.755 |
+| unconditional (null emotion) | 200 | — | — | — | — | — | 1.000 | 8 | 0.984 | 0.795 |
+| random-piano baseline | 40 | — | — | — | — | — | 1.000 | 3 | 0.913 | **0.324** |
+| end-to-end (text → BERT → gen) | 40 | 0.750 | 0.598–0.858 | 0.875 | 0.825 | 1.141 | 1.000 | 6 | 0.978 | 0.694 |
+
+**Classifier-free guidance is what makes the conditioning work.** 0.550 → 0.790 from guidance 1.0
+to 3.0, and those intervals do not overlap. Chance is 0.25.
+
+**What survives is arousal; valence only appears with guidance.** With guidance off, valence is
+0.590 (lower bound 0.521, barely off the 0.5 coin flip) while arousal is already 0.885. Guidance
+adds +0.11 to arousal and **+0.205 to valence** — its contribution is almost entirely to the axis
+that was failing. This follows from the tokenizer: arousal is written directly into note density,
+velocity and duration, while valence lives in harmony, which `SHIFT/PITCH/DUR/VEL` encodes only
+implicitly.
+
+**The failures are directional.** At guidance 3.0, over 200 clips:
+
+```
+        recovered →   Q1   Q2   Q3   Q4    recall
+conditioned Q1      [ 37   13    0    0]    0.74
+            Q2      [  3   47    0    0]    0.94
+            Q3      [  0    1   47    2]    0.94
+            Q4      [  0    0   23   27]    0.54
+```
+
+One cross-arousal error in 200. Forty-one valence errors, of which **36 run positive → negative
+and 5 the other way**. Q4 is the weak quadrant: 23 of 50 "positive and calm" clips come back as
+"negative and subdued". The generator renders calm as melancholy rather than content.
+
+**It is not copying and not collapsing.** Across all 800 generated clips, not one shares a single
+8-note pattern with the training corpus; the longest exactly-copied run is 6–7 notes against real
+held-out clips' 40. The generator is *less* derivative of EMOPIA than EMOPIA is of itself.
+
+**Guidance 3.0 is the operating point, but not because it beats 5.0 on accuracy** — 0.790 vs
+0.725 overlaps. Because 5.0 buys no accuracy while costing on every other axis: marginal fidelity
+0.803 → 0.755, joint distance 1.186 → 1.318, diversity 0.981 → 0.974, and clips shorten from 122
+to 108 notes as the EOS rate climbs 0.145 → 0.305. The two probes also agree most at 3.0 (0.800,
+against 0.565 on real music) — a label-free signal pointing at the same setting.
+
+**End to end**, the text stage scores 0.850 on the prompt set and the whole chain 0.750. The
+stages are not independent: BERT's errors concentrate on Q4, the same quadrant the generator
+renders worst, so fixing valence would pay off twice.
+
+### What these numbers do not say
+
+None of them measures whether the music is *good*. They measure controllability, novelty, and
+distributional similarity to real EMOPIA. The defensible claim is that the intended emotion is
+recoverable from generated audio at a rate approaching what real human-composed music achieves on
+the same test, without copying the training data — not that it sounds good. That needs listeners.
+
+Two further caveats are recorded in `metrics.json` under `notes`. Fidelity has two views that can
+disagree: per-feature overlap describes the marginals and stays flat across the sweep, while
+`inter_over_intra` measures the joint distribution and grows monotonically (1.036 → 1.318) —
+guidance keeps each feature in range while moving their combinations away from real music. And
+`inter_over_intra` alone is fooled by a collapsed set near the centroid: the random-piano baseline
+scores 0.975 on it, nominally closer to real EMOPIA than real held-out clips, while its marginal
+overlap of 0.324 correctly ranks it last.
 
 ## Frontend Demo
 
