@@ -5,6 +5,10 @@ classifier:
 generator:
   checkpoint: models/real_training/music_transformer_fulldata/best.pt
   tokenizer: models/real_training/music_transformer_fulldata/tokenizer/vocab.json
+probes:
+  # MIDI-to-quadrant probes for the frontend round-trip panel. The app starts with the panel
+  # disabled when this directory is absent, so generation never depends on it.
+  directory: models/real_training/music_probe
 output:
   sample_dir: artifacts/samples
 generation:

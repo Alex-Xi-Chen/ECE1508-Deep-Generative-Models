@@ -1,0 +1,40 @@
+# Full evaluation run. Sized for a Colab T4: 50 clips per quadrant across four guidance
+# scales is 800 conditioned clips, which batched sampling brings down to minutes.
+classifier:
+  model_dir: models/real_training/classifier_bert_base
+generator:
+  checkpoint: models/real_training/music_transformer_fulldata/best.pt
+  tokenizer: models/real_training/music_transformer_fulldata/tokenizer/vocab.json
+probes:
+  directory: models/real_training/music_probe
+data:
+  # The training corpus is the reference frame for novelty and distributional fidelity, and
+  # the test split supplies the probe ceiling row. This points at the committed copy of the
+  # exact split that trained the generator, so a fresh checkout can run the evaluation
+  # without downloading the 1 GB EMOPIA archive.
+  tokenized_dir: models/real_training/emopia_tokenized
+  note_budget: 128
+generation:
+  clips_per_quadrant: 50
+  batch_size: 25
+  max_tokens: 512
+  temperature: 1.0
+  top_k: 32
+  seed: 1508
+  # The sweep. 1.0 is classifier-free guidance switched off, which isolates what it adds.
+  guidance_scales: [1.0, 2.0, 3.0, 5.0]
+  # Guidance used for the end-to-end row; matches the shipped inference default.
+  guidance_scale: 3.0
+  random_baseline_clips: 40
+novelty:
+  ngram_sizes: [4, 8, 16]
+  # Jaccard diversity saturates at 1.0 from n=4 up even on real EMOPIA, so the graded sizes
+  # are 1 and 2 and n=4 serves as a collapse tripwire.
+  diversity_sizes: [1, 2, 4]
+  headline_diversity_n: 2
+end_to_end:
+  enabled: true
+  # Null uses the whole 40-sentence committed prompt set.
+  max_prompts: null
+output:
+  directory: artifacts/evaluation

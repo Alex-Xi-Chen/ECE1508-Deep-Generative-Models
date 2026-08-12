@@ -38,7 +38,7 @@ The classifier and generator share the same four-label emotion space:
 ## Repository Layout
 
 ```text
-configs/                 YAML configs for classifier, generator, and inference
+configs/                 YAML configs for classifier, generator, inference, probes, and evaluation
 docs/                    design_decisions.md plus superpowers/ planning notes
 notebooks/               Colab demo notebook
 src/musemotion/          Python package and CLI modules
@@ -46,7 +46,7 @@ tests/                   Local tests with synthetic fixtures
 scripts/                 Figure generation and classifier download helpers
 figures/                 Real training charts and CSV metric histories
 samples/                 Committed example MIDI clips, one per quadrant
-models/real_training/    Trained checkpoints (classifier weights via Google Drive)
+models/real_training/    Trained checkpoints, MIDI-to-quadrant probes, tokenized EMOPIA splits
 data/raw/emopia/         Expected EMOPIA dataset location, ignored by git
 artifacts/               Generated datasets, checkpoints, metrics, and samples
 ```
@@ -183,6 +183,41 @@ python -m musemotion.cli.generate `
   --text "I feel hopeful but calm today" `
   --output artifacts/samples/demo.mid
 ```
+
+## Validating The Generated Music
+
+Training loss and classifier accuracy measure prediction, not perception; neither says whether a
+listener would hear the intended emotion. Two commands measure the output itself.
+
+Train the MIDI-to-quadrant probes — the models that read generated music back and predict its
+quadrant:
+
+```bash
+python -m musemotion.cli.train_probe --config configs/probe.yaml
+```
+
+Score the generator with them:
+
+```bash
+python -m musemotion.cli.evaluate --config configs/evaluation.yaml
+```
+
+This writes `artifacts/evaluation/metrics.json` and `comparison_table.csv`, comparing the
+generator against real held-out EMOPIA clips, a guidance sweep, two floors (unconditional
+sampling and the random-piano baseline), and the end-to-end text-to-music path. Figures come from
+`python scripts/plot_evaluation.py --metrics artifacts/evaluation/metrics.json --save`.
+
+Both commands run on the committed probes and tokenized splits, so neither needs the EMOPIA
+download. Two numbers are worth knowing before reading any result:
+
+- **The probes reach 0.66 and 0.60 on real held-out clips**, not 1.0. Four-way symbolic emotion
+  recognition is hard, so that is the ceiling every round-trip accuracy is read against, and the
+  `controllability_ratio` column does that division.
+- **Retrained on permuted labels the probes collapse to chance.** That control is what makes the
+  rest of the numbers worth anything; it is recorded in `probe_metadata.json`.
+
+No metric here measures musical quality. They measure controllability, novelty, and
+distributional similarity to real EMOPIA — answering whether the music is *good* needs listeners.
 
 ## Frontend Demo
 
@@ -362,10 +397,13 @@ Current local coverage includes:
 - `configs/classifier.yaml`: BERT model name, max sequence length, classifier training settings
 - `configs/music.yaml`: EMOPIA paths, MIDI tokenization settings, Transformer architecture, generator training settings
 - `configs/inference.yaml`: classifier checkpoint, generator checkpoint, tokenizer path, sampling defaults
+- `configs/probe.yaml`: MIDI-to-quadrant probe architecture, training settings, shuffled-label control
+- `configs/evaluation.yaml`: clip counts, guidance sweep, novelty settings, end-to-end prompt set
+- `configs/evaluation_smoke.yaml`: the same run capped for a laptop; its numbers are not reportable
 
 ## Notes
 
 - `data/`, `artifacts/`, `checkpoints/`, `output/`, `.venv/`, and `.superpowers/` are ignored.
-- The repo does not ship EMOPIA or full training artifacts.
-- The repo ships the music generator checkpoint under `models/real_training/`; the `bert-base-uncased` classifier weights are fetched from Google Drive via `scripts/download_classifier.py`.
+- The repo does not ship the raw EMOPIA audio or MIDI, or the bulky training artifacts. It does ship the tokenized EMOPIA splits (3.5 MB) under `models/real_training/emopia_tokenized/`, so the evaluation and probe training run without the 1 GB dataset download; EMOPIA is CC BY 4.0 and that folder carries the attribution.
+- The repo ships the music generator checkpoint and the MIDI-to-quadrant probes under `models/real_training/`; the `bert-base-uncased` classifier weights are fetched from Google Drive via `scripts/download_classifier.py`.
 - The implementation is meant to train on GPU or Colab, while remaining testable on a normal laptop.

@@ -62,7 +62,50 @@ def collate_music_batch(
     }
 
 
+def collate_probe_batch(
+    examples: list[dict[str, Any]],
+    pad_token_id: int,
+    max_seq_len: int | None = None,
+) -> dict[str, torch.Tensor]:
+    """Collate for the MIDI-to-quadrant probe: whole sequence in, one label out.
+
+    Differs from ``collate_music_batch`` in two ways. There is no next-token shift, because
+    the probe classifies a finished clip rather than predicting its continuation. And the
+    label is the clip's quadrant, not the following token.
+
+    Sequences are head-truncated. Generated clips always begin at BOS and stop at the token
+    cap, so cropping real clips from the head keeps the probe's training inputs aligned with
+    the inputs it is asked about at evaluation time.
+    """
+    if max_seq_len is not None and max_seq_len <= 0:
+        raise ValueError("max_seq_len must be positive when provided.")
+
+    sequences = [_head_truncate(example["token_ids"], max_seq_len) for example in examples]
+    max_length = max(len(sequence) for sequence in sequences)
+    input_rows: list[list[int]] = []
+    attention_rows: list[list[int]] = []
+    labels: list[int] = []
+
+    for example, token_ids in zip(examples, sequences):
+        padding = max_length - len(token_ids)
+        input_rows.append(list(token_ids) + [pad_token_id] * padding)
+        attention_rows.append([1] * len(token_ids) + [0] * padding)
+        labels.append(int(example["emotion_id"]))
+
+    return {
+        "input_ids": torch.tensor(input_rows, dtype=torch.long),
+        "attention_mask": torch.tensor(attention_rows, dtype=torch.long),
+        "labels": torch.tensor(labels, dtype=torch.long),
+    }
+
+
 def _truncate_token_ids(token_ids: list[int], max_seq_len: int | None) -> list[int]:
     if max_seq_len is None:
         return token_ids
     return token_ids[: max_seq_len + 1]
+
+
+def _head_truncate(token_ids: list[int], max_seq_len: int | None) -> list[int]:
+    if max_seq_len is None:
+        return list(token_ids)
+    return list(token_ids[:max_seq_len])

@@ -1,0 +1,42 @@
+# Capped evaluation for local CPU runs and for proving the pipeline end to end quickly.
+# Same code path as configs/evaluation.yaml, following the colab_smoke_*.yaml convention.
+# The numbers from this config are not reportable: with 4 clips per quadrant the confidence
+# intervals are wider than the effects being measured.
+classifier:
+  model_dir: models/real_training/classifier_bert_base
+generator:
+  checkpoint: models/real_training/music_transformer_fulldata/best.pt
+  tokenizer: models/real_training/music_transformer_fulldata/tokenizer/vocab.json
+probes:
+  # The committed probes, so a smoke run works on a fresh checkout. Point this at artifacts/probe
+  # to score with locally trained probes instead.
+  directory: models/real_training/music_probe
+data:
+  tokenized_dir: models/real_training/emopia_tokenized
+  # Kept at max_tokens / 4 so real and generated clips are compared at the same length.
+  #
+  # This is still not the committed probes' 128-note training window, so a smoke run prints a
+  # length-mismatch warning and reports a depressed ceiling (measured: 0.574 rather than 0.657).
+  # That is the price of a run that finishes on a laptop, and it is the reason these numbers are
+  # not reportable. Use configs/evaluation.yaml for anything that gets quoted.
+  note_budget: 32
+generation:
+  clips_per_quadrant: 4
+  batch_size: 8
+  max_tokens: 128
+  temperature: 1.0
+  top_k: 32
+  seed: 1508
+  guidance_scales: [1.0, 3.0]
+  guidance_scale: 3.0
+  random_baseline_clips: 4
+novelty:
+  ngram_sizes: [4, 8]
+  diversity_sizes: [1, 2]
+  headline_diversity_n: 2
+end_to_end:
+  # Off by default: it needs the 438 MB BERT weights, which are fetched separately.
+  enabled: false
+  max_prompts: 8
+output:
+  directory: artifacts/evaluation_smoke

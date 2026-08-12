@@ -1,0 +1,37 @@
+# Trains the MIDI-to-quadrant probes used to score generated clips.
+# Both probes train on the same EMOPIA split the generator trained on; their accuracy on the
+# held-out test split is the ceiling every round-trip number is read against.
+data:
+  # The committed copy of the split that trained the generator, so retraining the probes needs
+  # no EMOPIA download. Point this at artifacts/music/tokenized to use a fresh preprocessing run.
+  tokenized_dir: models/real_training/emopia_tokenized
+  tokenizer: models/real_training/music_transformer_fulldata/tokenizer/vocab.json
+  # Clips are head-cropped to this many notes, matching a 512-token generation. Real EMOPIA
+  # clips run to ~225 notes at the median, so without a matched budget the probe would train
+  # on longer inputs than it is later asked about.
+  note_budget: 128
+model:
+  d_model: 128
+  n_heads: 4
+  n_layers: 2
+  dropout: 0.1
+  # max_seq_len defaults to note_budget * 4 + 2, which holds the clip plus BOS and EOS exactly.
+training:
+  output_dir: artifacts/probe
+  # The committed probe peaked at epoch 10 on validation macro-F1 and overfits clearly after it
+  # (validation loss 0.90 at the peak, 1.64 by epoch 20, while training loss falls to 0.27).
+  # 14 leaves headroom around the peak without paying for epochs that only overfit; the
+  # best-on-macro-F1 selection means this still yields the same checkpoint.
+  epochs: 14
+  batch_size: 16
+  learning_rate: 0.0003
+  weight_decay: 0.01
+  grad_clip_norm: 1.0
+  seed: 1508
+feature_probe:
+  C: 1.0
+  max_iter: 2000
+controls:
+  # Retrains both probes on permuted labels. Must collapse to ~0.25; if it does not, the probe
+  # is reading something other than emotion and no downstream metric means anything.
+  shuffled_labels: true

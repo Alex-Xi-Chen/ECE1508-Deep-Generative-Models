@@ -61,9 +61,7 @@ def train_classifier(config: dict[str, Any]) -> None:
     # Balanced class weights (inverse frequency) to counter GoEmotions->quadrant
     # imbalance, which otherwise collapses the model to the majority quadrant.
     train_labels = np.asarray(tokenized["train"]["labels"])
-    counts = np.bincount(train_labels, minlength=len(EMOPIA_QUADRANTS)).astype("float64")
-    counts = np.clip(counts, 1.0, None)  # guard empty quadrants against div-by-zero
-    class_weights = torch.tensor(counts.sum() / (len(counts) * counts), dtype=torch.float)
+    class_weights = torch.tensor(balanced_class_weights(train_labels), dtype=torch.float)
 
     class WeightedTrainer(Trainer):
         def __init__(self, *args: Any, class_weights: Any = None, **kwargs: Any) -> None:
@@ -189,12 +187,35 @@ def build_trainer(trainer_cls: Any, trainer_kwargs: dict[str, Any], tokenizer: A
         return trainer_cls(**trainer_kwargs, processing_class=tokenizer)
 
 
-def compute_classifier_metrics(eval_pred: Any) -> dict[str, float]:
+def balanced_class_weights(labels: Any, num_classes: int = len(EMOPIA_QUADRANTS)) -> np.ndarray:
+    """Inverse-frequency class weights, as a plain numpy array.
+
+    Both the text classifier and the MIDI probe counter quadrant imbalance the same way, so the
+    formula lives here once. Returned as numpy rather than a tensor so this module keeps its
+    lazy torch import; callers wrap it in whatever they need.
+    """
+    counts = np.bincount(np.asarray(labels, dtype="int64"), minlength=num_classes).astype("float64")
+    counts = np.clip(counts, 1.0, None)  # guard empty quadrants against div-by-zero
+    return counts.sum() / (len(counts) * counts)
+
+
+def compute_classifier_metrics(eval_pred: Any, label_set: Any = None) -> dict[str, float]:
+    """Accuracy and macro-F1.
+
+    ``label_set`` fixes which classes the macro average runs over. Without it, scikit-learn
+    averages only the classes that appear in this particular set of labels and predictions, so a
+    run that collapses onto two quadrants is averaged over two while a healthy run is averaged
+    over four - and the two numbers then get printed side by side as though they were the same
+    statistic. The shuffled-label control is exactly the case that collapses, so it passes the
+    full quadrant set. The default is left as-is to keep the classifier's existing metrics
+    comparable with the numbers already reported for it.
+    """
     logits, labels = eval_pred
     predictions = np.argmax(logits, axis=-1)
+    extra = {"labels": list(label_set), "zero_division": 0} if label_set is not None else {}
     return {
         "accuracy": float(accuracy_score(labels, predictions)),
-        "macro_f1": float(f1_score(labels, predictions, average="macro")),
+        "macro_f1": float(f1_score(labels, predictions, average="macro", **extra)),
     }
 
 

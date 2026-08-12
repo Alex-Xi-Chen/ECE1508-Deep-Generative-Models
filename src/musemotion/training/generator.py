@@ -157,18 +157,29 @@ def save_generator_checkpoint(
     return checkpoint_path
 
 
-def write_generator_history(output_dir: str | Path, history: list[dict[str, float | int]]) -> None:
+def write_generator_history(
+    output_dir: str | Path,
+    history: list[dict[str, float | int]],
+    fields: list[str] | None = None,
+) -> None:
+    """Write per-epoch history as CSV and JSON.
+
+    ``fields`` selects and orders the CSV columns; it defaults to the generator's columns.
+    The probe passes its own so it can record accuracy and macro-F1 through the same writer.
+    """
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
-    fields = ["epoch", "train_loss", "validation_loss", "best_validation_loss"]
-    lines = [",".join(fields)]
+    columns = fields or ["epoch", "train_loss", "validation_loss", "best_validation_loss"]
+    lines = [",".join(columns)]
     for row in history:
-        lines.append(",".join(_history_value(row[field]) for field in fields))
+        lines.append(",".join(_history_value(row.get(field)) for field in columns))
     (output_path / "training_history.csv").write_text("\n".join(lines) + "\n", encoding="utf-8")
     (output_path / "training_history.json").write_text(json.dumps(history, indent=2), encoding="utf-8")
 
 
-def _history_value(value: float | int) -> str:
+def _history_value(value: float | int | None) -> str:
+    if value is None:
+        return ""
     if isinstance(value, float):
         return f"{value:.8g}"
     return str(value)
