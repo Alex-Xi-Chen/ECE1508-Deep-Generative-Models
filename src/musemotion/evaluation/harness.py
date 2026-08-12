@@ -261,6 +261,7 @@ def run_evaluation(config: dict[str, Any]) -> dict[str, Any]:
             note_budget=note_budget,
             torch_module=torch,
             fidelity_cache=fidelity_cache,
+            balanced_accuracies=_balanced_accuracies(systems, default_guidance),
         )
         if end_to_end_payload.get("system"):
             systems["end_to_end"] = end_to_end_payload["system"]
@@ -446,6 +447,7 @@ def _run_end_to_end(
     note_budget: int,
     torch_module: Any,
     fidelity_cache: dict[str, Any] | None = None,
+    balanced_accuracies: dict[str, float] | None = None,
 ) -> dict[str, Any]:
     """Run the committed text-to-music path over the fixed prompt set.
 
@@ -523,7 +525,15 @@ def _run_end_to_end(
     for name, probe in probes.items():
         probabilities = _probe_probabilities(probe, clips)
         recovered = [int(value) for value in np.argmax(probabilities, axis=-1)]
-        attribution[name] = stage_attribution(intended, classified, recovered)
+        attribution[name] = stage_attribution(
+            intended,
+            classified,
+            recovered,
+            # The matching guidance row: the same generator over an equal number of clips per
+            # quadrant. Comparing against that, rather than against its accuracy on the mix the
+            # classifier happens to produce, is what makes the comparison an actual test.
+            balanced_generator_accuracy=(balanced_accuracies or {}).get(name),
+        )
 
     return {
         "system": system,
@@ -752,6 +762,36 @@ def _label_distribution(predictions: Sequence[int]) -> dict[str, float]:
     return {name: float(count / total) for name, count in counts.items()}
 
 
+def _balanced_accuracies(
+    systems: dict[str, Any], guidance: float
+) -> dict[str, float]:
+    """Per-probe round-trip accuracy from the guidance row matching the end-to-end run.
+
+    Balanced across quadrants by construction, which is the reference the end-to-end row has
+    to be compared against for the comparison to mean anything.
+
+    ``generation.guidance_scale`` and ``generation.guidance_scales`` are separate config keys and
+    nothing forces the first to appear in the second. When it does not, there is no matching row
+    and the end-to-end row loses its only real test - so the miss is reported rather than
+    returning an empty mapping and letting the run look complete.
+    """
+    label = f"guidance={guidance:g}"
+    if label not in systems:
+        available = ", ".join(name for name in systems if name.startswith("guidance=")) or "none"
+        print(
+            f"warning: no {label} row to compare the end-to-end result against (swept: "
+            f"{available}). Add {guidance:g} to generation.guidance_scales, or the end-to-end "
+            "row will report no quadrant-mix ratio."
+        )
+        return {}
+    row = systems[label].get("round_trip_by_probe", {})
+    return {
+        name: value["overall"]["accuracy"]
+        for name, value in row.items()
+        if value.get("overall", {}).get("accuracy") is not None
+    }
+
+
 def _probe_ceilings(probe_metadata: dict[str, Any]) -> dict[str, float | None]:
     """Each probe's accuracy on real held-out clips, which bounds its round-trip accuracy."""
     ceilings: dict[str, float | None] = {}
@@ -815,12 +855,25 @@ def _interpretation_notes() -> dict[str, str]:
             "so it carries the text stage's error as well as the generator's. Its "
             "round_trip_vs_conditioning field holds the same clips scored against the quadrant "
             "that actually conditioned them, which is the number directly comparable with the "
-            "guidance rows; the gap between the two is what the text stage costs. Adding that "
-            "stage can only cost accuracy in expectation, so the comparison of interest is the "
-            "independence ratio, not which row is higher. It is not a strict bound: a clip "
-            "conditioned on the wrong quadrant can still be recovered as the intended one when "
-            "the two are hard to separate, which is counted separately as "
-            "text_wrong_but_recovered_intended rather than credited as a success."
+            "guidance rows. Note that conditional_product (text accuracy times generation given "
+            "correct text) is an algebraic identity with end-to-end accuracy whenever no clip is "
+            "recovered by accident - the text term cancels - so their agreement is not evidence "
+            "about the stages. The real comparison is quadrant_mix_ratio, which divides observed "
+            "end-to-end accuracy by text accuracy times the generator's accuracy over a balanced "
+            "set of quadrants; above 1.0 means the classifier's predictions land on quadrants the "
+            "generator renders more legibly than average."
+        ),
+        "fidelity_has_two_views": (
+            "mean_feature_overlap averages per-feature histogram overlaps, so it describes the "
+            "marginal distributions; inter_over_intra is a distance in the joint 28-dimensional "
+            "feature space. They can disagree, and on this generator they do: across the guidance "
+            "sweep the marginals hold roughly flat (0.795, 0.810, 0.803) while the joint distance "
+            "grows monotonically (1.036, 1.097, 1.186). Guidance keeps each feature in range while "
+            "moving their combinations away from real music. Read both. "
+            "inter_over_intra in particular is fooled by a tightly clustered set near the centre of "
+            "the reference distribution: the random-piano baseline scores 0.975 on it, nominally "
+            "closer to real EMOPIA than real held-out clips are, while its marginal overlap of "
+            "0.324 correctly identifies it as the worst row in the table."
         ),
         "diversity_saturation": (
             "Jaccard diversity saturates at 1.0 for n >= 4 even on real EMOPIA clips, where no "
@@ -832,8 +885,10 @@ def _interpretation_notes() -> dict[str, str]:
             "Most generated clips run to the token cap rather than emitting an ending, so clip "
             "length is largely a sampling hyperparameter here; length-dependent features are "
             "excluded from the fidelity comparison for that reason. The EOS rate is not zero "
-            "though, and it rises with guidance (measured: 0.08 at guidance 1.0 against 0.33 at "
-            "guidance 3.0), so guidance shortens clips as well as sharpening their emotion. The "
+            "though, and it rises monotonically with guidance (measured over 200 clips per "
+            "setting: 0.055, 0.085, 0.145, 0.305 at guidance 1, 2, 3 and 5), with mean note count "
+            "falling 126 to 108 across the same range - guidance shortens clips as well as "
+            "sharpening their emotion. The "
             "real and random_piano rows report no EOS rate at all: those clips are re-encoded "
             "through the tokenizer, which appends EOS unconditionally."
         ),

@@ -231,12 +231,12 @@ def stage_attribution(
     intended: Sequence[int],
     classified: Sequence[int],
     recovered: Sequence[int],
+    balanced_generator_accuracy: float | None = None,
 ) -> dict[str, Any]:
     """Localise end-to-end failures between the text stage and the generation stage.
 
     Adding the text stage can only cost accuracy in expectation, so the useful question is not
-    which number is higher but where the loss happens and whether the two stages fail
-    independently.
+    which number is higher but where the loss happens.
 
     One exception keeps this from being a strict bound, and it is counted rather than ignored:
     a clip generated from the *wrong* quadrant can still be recovered as the intended one, when
@@ -244,10 +244,15 @@ def stage_attribution(
     ``text_wrong_but_recovered_intended`` bucket. It is luck, not competence, which is why it is
     reported separately instead of being folded into the success count.
 
-    ``independence_ratio`` divides observed end-to-end accuracy by the product of the two
-    stage accuracies. Near 1.0 the stages fail independently. Well below 1.0 the errors are
-    correlated - the text stage is misreading exactly the quadrants generation renders least
-    legibly - which would mean one fix pays off in both places.
+    ``balanced_generator_accuracy`` should be the generator's round-trip accuracy over an equal
+    number of clips per quadrant - the matching row from the guidance sweep. Without it there is
+    no independence test here at all, only the exact decomposition described below.
+
+    ``quadrant_mix_ratio`` divides observed end-to-end accuracy by text accuracy times the
+    *balanced* generator accuracy. Near 1.0 the classifier's predictions are spread across
+    quadrants the generator handles about as well as average. Above 1.0 they concentrate on the
+    quadrants it renders most legibly, and below 1.0 on the ones it renders worst - which is the
+    case worth acting on, because it means one fix would pay off in both stages.
     """
     intended_ids = [int(value) for value in intended]
     classified_ids = [int(value) for value in classified]
@@ -283,6 +288,23 @@ def stage_attribution(
     )
     predicted_product = text_accuracy.accuracy * generation_given_text.accuracy
 
+    # This decomposition is exact rather than evidential, and saying so matters. Expanding it,
+    # text_accuracy * generation_given_correct_text = (text_ok/N) * (both/text_ok) = both/N, and
+    # end-to-end accuracy is (both + lucky)/N. The text term cancels, so their ratio is
+    # 1 + lucky/both: it reports the rate of accidental recoveries and nothing else. It cannot
+    # detect correlated stage errors, because the conditional term already absorbs them.
+    lucky_rate = float(music_only / both) if both else None
+
+    # The genuine independence test compares against how the generator does on a *balanced* set
+    # of quadrants, not on the skewed mix the classifier happens to produce. Above 1.0 means the
+    # classifier's predictions land on quadrants the generator renders more legibly than average.
+    # `is not None`, not truthiness: a generator that scored 0.0 on balanced quadrants is a
+    # measurement, and treating it as absent would drop the test without saying so.
+    expected_if_independent = (
+        text_accuracy.accuracy * balanced_generator_accuracy
+        if balanced_generator_accuracy is not None
+        else None
+    )
     return {
         "counts": {
             "total": total,
@@ -294,9 +316,15 @@ def stage_attribution(
         "text_accuracy": text_accuracy.to_dict(),
         "generation_accuracy_given_correct_text": generation_given_text.to_dict(),
         "end_to_end_accuracy": end_to_end.to_dict(),
-        "predicted_product": predicted_product,
-        "independence_ratio": (
-            float(end_to_end.accuracy / predicted_product) if predicted_product > 0 else None
+        "conditional_product": predicted_product,
+        "conditional_product_equals_end_to_end": music_only == 0,
+        "lucky_recovery_rate": lucky_rate,
+        "balanced_generator_accuracy": balanced_generator_accuracy,
+        "expected_if_independent": expected_if_independent,
+        "quadrant_mix_ratio": (
+            float(end_to_end.accuracy / expected_if_independent)
+            if expected_if_independent
+            else None  # a zero expectation makes the ratio undefined, not zero
         ),
     }
 

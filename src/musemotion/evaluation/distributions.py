@@ -43,6 +43,15 @@ class SetDistances:
 
         Near 1.0 means the generated clips sit no further from real clips than real clips sit
         from each other. Well above 1.0 means they occupy a different region of feature space.
+
+        This must not be read alone, because a mean distance rewards collapse. A set clustered
+        tightly near the centre of the reference distribution has a small mean distance to every
+        reference point - smaller than the reference's own mean pairwise distance, which includes
+        its far-apart pairs - so it scores *better* than real data while being obviously worse
+        music. That is not hypothetical: the random-piano baseline scores 0.975 here, nominally
+        closer to real EMOPIA than real held-out clips at 1.006, while its marginal overlap of
+        0.324 correctly ranks it last. Pair this with ``per_feature_overlap``, which catches the
+        degenerate case, and with the diversity measures, which catch the collapse directly.
         """
         if self.intra_reference <= 0:
             return 0.0

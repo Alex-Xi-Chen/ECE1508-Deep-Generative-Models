@@ -1,3 +1,4 @@
+import pytest
 import numpy as np
 
 from musemotion.evaluation.report import (
@@ -132,13 +133,42 @@ def test_stage_attribution_measures_generation_only_where_text_was_right():
     assert attribution["end_to_end_accuracy"]["accuracy"] == 0.5
 
 
-def test_independence_ratio_is_one_when_the_product_predicts_the_outcome():
-    intended = [0, 1, 2, 3]
-    attribution = stage_attribution(intended, intended, intended)
+def test_the_conditional_product_equals_end_to_end_not_evidence():
+    """Expanding it, text_acc * gen_given_correct_text = both/N, which is end-to-end minus luck.
 
-    assert attribution["end_to_end_accuracy"]["accuracy"] == 1.0
-    assert attribution["predicted_product"] == 1.0
-    assert attribution["independence_ratio"] == 1.0
+    So the two agree exactly whenever no clip is recovered by accident, and their ratio can only
+    ever report the rate of accidental recoveries. It is flagged as an identity for that reason,
+    so a reader cannot mistake the agreement for a finding about the stages.
+    """
+    intended = [0, 1, 2, 3]
+    classified = [0, 1, 2, 0]      # the text stage misses one
+    recovered = [0, 1, 2, 0]       # and that clip is not recovered as intended
+
+    attribution = stage_attribution(intended, classified, recovered)
+
+    assert attribution["counts"]["text_wrong_but_recovered_intended"] == 0
+    assert attribution["conditional_product_equals_end_to_end"] is True
+    assert attribution["conditional_product"] == attribution["end_to_end_accuracy"]["accuracy"]
+    assert attribution["lucky_recovery_rate"] == 0.0
+
+
+def test_the_independence_test_uses_the_balanced_generator_accuracy():
+    """The real comparison is against a balanced set of quadrants, not the classifier's mix."""
+    intended = [0, 1, 2, 3]
+    attribution = stage_attribution(
+        intended, intended, intended, balanced_generator_accuracy=0.5
+    )
+
+    # Perfect here, but the generator only manages 0.5 across balanced quadrants.
+    assert attribution["expected_if_independent"] == pytest.approx(1.0 * 0.5)
+    assert attribution["quadrant_mix_ratio"] == pytest.approx(2.0)
+
+
+def test_no_independence_test_is_reported_without_a_balanced_reference():
+    attribution = stage_attribution([0, 1], [0, 1], [0, 1])
+
+    assert attribution["expected_if_independent"] is None
+    assert attribution["quadrant_mix_ratio"] is None
 
 
 def test_lucky_recovery_is_counted_separately_not_credited_as_competence():
@@ -154,8 +184,9 @@ def test_lucky_recovery_is_counted_separately_not_credited_as_competence():
     assert attribution["end_to_end_accuracy"]["accuracy"] == 1.0
     # No prompt had correct text, so there is nothing to credit generation with.
     assert attribution["generation_accuracy_given_correct_text"]["count"] == 0
-    assert attribution["predicted_product"] == 0.0
-    assert attribution["independence_ratio"] is None
+    assert attribution["conditional_product"] == 0.0
+    assert attribution["conditional_product_equals_end_to_end"] is False
+    assert attribution["lucky_recovery_rate"] is None
 
 
 def test_well_formedness_reports_eos_rate_and_decode_yield():

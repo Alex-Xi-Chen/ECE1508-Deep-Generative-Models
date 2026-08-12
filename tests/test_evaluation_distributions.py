@@ -219,3 +219,35 @@ def test_out_of_range_values_still_count_as_mass():
 
     # Half the candidate's mass sits far outside the reference, so overlap must drop accordingly.
     assert overlapping_area(inside, with_tail) < 0.6
+
+
+def test_a_collapsed_set_at_the_centroid_beats_real_data_on_distance_alone():
+    """Pins the weakness that the random-piano baseline exposed in a real run.
+
+    A mean distance rewards collapse: a set clustered at the centre of the reference distribution
+    sits closer to every reference point than the reference's own far-apart pairs sit to each
+    other, so inter_over_intra drops below 1.0 for output that is obviously worse. Measured, the
+    random-piano row scored 0.975 against real held-out clips at 1.006. The marginal overlap is
+    what catches it, which is why the two are always reported together.
+    """
+    rng = np.random.default_rng(11)
+    reference = rng.normal(size=(200, 6))
+    collapsed = np.full((40, 6), 0.001)          # degenerate, parked at the centroid
+    faithful = rng.normal(size=(40, 6))          # genuinely drawn from the reference
+
+    collapsed_distance, _ = set_distances(reference, collapsed)
+    faithful_distance, _ = set_distances(reference, faithful)
+
+    # The distance metric prefers the degenerate set - this is the failure being pinned.
+    assert collapsed_distance.inter_over_intra < faithful_distance.inter_over_intra
+    assert collapsed_distance.inter_over_intra < 1.0
+
+    # Overlap is not fooled: it ranks the degenerate set far below the faithful one.
+    names = [f"f{i}" for i in range(6)]
+    collapsed_overlap = np.mean(list(per_feature_overlap(reference, collapsed, names).values()))
+    faithful_overlap = np.mean(list(per_feature_overlap(reference, faithful, names).values()))
+    assert collapsed_overlap < 0.3 < faithful_overlap
+
+    # And intra-candidate spread names the collapse outright.
+    assert collapsed_distance.intra_candidate < 0.01
+    assert faithful_distance.intra_candidate > 1.0

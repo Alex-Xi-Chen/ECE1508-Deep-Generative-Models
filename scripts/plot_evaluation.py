@@ -213,8 +213,18 @@ def guidance_sweep_figure(metrics: dict[str, Any]) -> Figure:
     """Controllability against distributional fidelity across the guidance sweep.
 
     Both series are unitless proportions in [0, 1], so they legitimately share one axis.
-    Crossing curves are the finding: guidance buys recoverable emotion and pays for it in
-    resemblance to real EMOPIA.
+
+    The tradeoff is real but it does not show up in this series. Measured over 200 clips per
+    setting, round-trip accuracy climbs 0.550 to 0.790 from guidance 1.0 to 3.0 while the
+    *marginal* overlap plotted here stays flat (0.795, 0.810, 0.803). The cost is in the joint
+    distribution instead: inter_over_intra grows monotonically over the same range (1.036, 1.097,
+    1.186, and 1.318 at guidance 5.0). Guidance keeps each feature inside its normal range while
+    steadily moving their combinations away from real music, so a reader who only sees this figure
+    would conclude guidance is free. It is not - see the fidelity_has_two_views note in
+    metrics.json.
+
+    What makes 3.0 the operating point is that 5.0 buys no further accuracy (0.725, well inside
+    3.0's interval) while costing on every fidelity view at once.
     """
     systems = _guidance_systems(metrics.get("systems", {}))
     scales = [float(name.split("=", 1)[1]) for name in systems]
@@ -493,13 +503,19 @@ def stage_attribution_figure(metrics: dict[str, Any], probe: str | None = None) 
     ax.set_xticklabels(["0%", "25%", "50%", "75%", "100%"], fontsize=9)
 
     payload = attribution[probe]
-    ratio = payload.get("independence_ratio")
-    subtitle = (
-        f"end-to-end {payload['end_to_end_accuracy']['accuracy']:.3f}  ·  "
-        f"predicted product {payload['predicted_product']:.3f}"
-    )
-    if ratio is not None:
-        subtitle += f"  ·  independence ratio {ratio:.2f}"
+    # Reads both the current and the older field names. Runs produced before conditional_product
+    # was renamed from predicted_product still have to plot, and the previous rename left this
+    # reader behind and broke the figure outright.
+    conditional = payload.get("conditional_product", payload.get("predicted_product"))
+    subtitle = f"end-to-end {payload['end_to_end_accuracy']['accuracy']:.3f}"
+    if conditional is not None:
+        subtitle += f"  ·  conditional product {conditional:.3f}"
+    mix_ratio = payload.get("quadrant_mix_ratio")
+    if mix_ratio is not None:
+        subtitle += f"  ·  quadrant-mix ratio {mix_ratio:.2f}"
+    elif payload.get("independence_ratio") is not None:
+        # Older runs only carry the superseded ratio; label it as such rather than as the test.
+        subtitle += f"  ·  legacy ratio {payload['independence_ratio']:.2f}"
     ax.set_title(
         f"End-to-end failure attribution ({probe} probe, n={total})\n{subtitle}",
         fontsize=11,
